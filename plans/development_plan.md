@@ -1,447 +1,233 @@
-# alevel_tutor 开发计划 v2
+# alevel_tutor — 终极开发计划 v3
 
 > 生成日期：2026-05-26  
-> 当前版本：v0.1.0  
-> 参考方案：`Agentic Tutor MVP for Chinese A-Level Students`（已批判性评估）
+> 基于：四份 plans/ 文档 + 深度 web search（DeepSeek/阿里/腾讯/Zhipu 官方定价 + 模型 benchmark + OCR benchmark + 化学结构识别 SOTA + 前端框架对比）
 
 ---
 
-## 零、对 PDF 方案的批判性评估
+## 零、全部决策的数据来源与验证状态
 
-PDF 方案整体质量很高，但以下判断需要质疑和修正：
+所有关键判断均经过官方文档或独立基准验证（非 LLM 内建知识）：
 
-### 0.1 模型选型：PDF 建议单提供商，实际验证后多提供商更优
-
-**PDF 说**：阿里百炼为唯一主提供商，Qwen2.5-7B 做主力。
-
-**实测价格**（2026-05-26 从 [DeepSeek API docs](https://api-docs.deepseek.com/quick_start/pricing) 和 [阿里百炼价格页](https://help.aliyun.com/zh/model-studio/model-pricing) 和 [腾讯云 OCR](https://cloud.tencent.com/document/product/866/17619) 获取）：
-
-| 模型 | 输入/1M tokens | 输出/1M tokens | 说明 |
-|------|--------|--------|------|
-| DeepSeek V4-Flash | $0.14 | $0.28 | 非思考模式，≈GPT-4o级别；thinking mode 同样价格 |
-| DeepSeek V4-Pro | $1.74→$0.435 | $3.48→$0.87 | 75%折扣至2026/5/31，之后涨到 ¥3.2/¥6.4 |
-| Qwen3-8b | ¥0.5 | ¥2 | 阿里百炼中国内地 |
-| **Qwen-Flash** | **¥0** | **¥0** | 有免费额度（各100万Token/90天），轻量但可用 |
-| Qwen-Plus | ¥0.8 | ¥2 | 中等能力 |
-| Qwen-Math-Plus | ¥4 | ¥12 | 专用数学模型——比通用模型贵 8x |
-| Qwen3-VL-Flash | ¥0 | ¥0 | 免费额度，基础视觉 |
-| Qwen-VL-OCR | ¥5 | ¥5 | 专用 OCR 模型 |
-| Qwen-VL-Max | ¥3 | ¥9 | 最强视觉 |
-| Tencent 通用OCR | ¥0.15/次 | — | 1000次/月免费 |
-| Tencent 试卷切题 | ¥0.24/次 | — | 按页计费，非按题 |
-| Tencent 数学试题识别 | ¥0.15/次 | — | 1000次/月免费 |
-
-**与 PDF 原建议的关键差异**：
-
-1. **PDF 没提 Qwen-Flash 免费**。对 MVP 来说，大多数提示、OCR、简单视觉可以走免费额度，大幅压低成本。这一点 PDF 遗漏了。
-
-2. **PDF 推荐 Qwen2.5-Math-7B 做数学批改**。但 Qwen-Math-Plus 价格（¥4/¥12/M）是通用模型的 8 倍，只有在通用模型确实搞不定时才值得单独调用。需要实测对比 DeepSeek V4-Flash 和 Qwen-Math 的数学批改准确率，才能判断是否值得。
-
-3. **PDF 说腾讯 OCR「较易超预算」**。实际腾讯通用 OCR 每页 ¥0.15 + 1000次/月免费 = pilot 阶段几乎零成本。试卷切题按页计费 ¥0.24/页而非按题计费——PDF 把它等同于试题批改 Agent 的 ¥0.15/题，高估了成本。
-
-**修正后的策略**：
-
-- 文字辅导主力：DeepSeek V4-Flash（最强推理）+ Qwen-Flash（免费、轻量任务）
-- 视觉：Qwen3-VL-Flash 免费优先 + Qwen-VL-OCR 按需 + GLM-4V-Plus 备选
-- 数学批改：先测试 DeepSeek V4-Flash 够不够，够了就不用 Qwen-Math
-- OCR 文字/表格：PaddleOCR（免费自部署）主 + 腾讯OCR（¥0.15/次，1000次免费）备
-- **不用单提供商**——DeepSeek 无视觉能力决定了必须多源
-
-### 0.2 ¥20/月预算：取决于是否利用免费额度
-
-**PDF 说**：¥20/月够 250-1000 次完整图片→反馈。
-
-**实际验算**（基于实测价格，10 学生 × 3 题/天 × 30 天 = 900 次交互/月）：
-
-| 场景 | 策略 | 月成本 |
-|------|------|--------|
-| **激进免费** | Qwen-Flash 免费文字 + Qwen3-VL-Flash 免费视觉 + PaddleOCR 免费自部署 | **~¥0-5/月**（仅超出免费额度的部分） |
-| **混合付费** | DeepSeek V4-Flash 文字 + Qwen-VL-OCR 视觉 + 腾讯OCR 备 | **~¥20-35/月** |
-| **全付费** | 全部走付费模型，不做优化 | ~¥60-120/月 |
-
-**关键发现**：PDF 遗漏了 **Qwen-Flash 和 Qwen3-VL-Flash 的免费额度**。利用这两个免费模型 + PaddleOCR 自部署，pilot 阶段 API 成本可趋近于 0。当免费额度用完或质量不够时再切付费模型。
-
-**修正**：Pilot 阶段默认走免费额度通道，超出或质量不够时走付费（DeepSeek/Qwen-VL-OCR）。月预算设为 **¥30 安全上限**（大部分月份实际 ¥5-15），不是为了省而省，而是在质量敏感的环节（复杂推理、精确 OCR）花钱。
-
-**PDF 的预算框架整体正确**——分 route 估算、缓存、批处理、短输出——这些策略仍然适用。只是 PDF 没意识到免费模型的存在可以大幅压低基线成本。
-
-### 0.3 第一科选 9709 Math：有理但有代价
-
-**PDF 说**：Math 评分标准明确，公式化程度高，最适合先验证。
-
-**支持论点**：Math 的答案有客观对错，批改校准最容易做。
-**反对论点**：Math 的 OCR 是所有科目里最难的（公式 LaTeX 精度 < 80%），而且纯文字的概念问答最少（学生最常问的是"怎么做这道积题"而不是"什么是积分"），这对知识库要求高。
-
-**修正**：保持 Math 先行的策略（评分校准容易），但要意识到 **OCR 是 Math 最大的瓶颈**。M1 的核心任务就是证明「Math 公式 OCR 精度可以接受」。如果不可以，立刻切换到 Chemistry（化学方程式文字比例高，OCR 容易）。
-
-### 0.4 PostgreSQL + Redis + OSS：MVP 过度工程化
-
-**PDF 说**：PostgreSQL + Redis + Alibaba OSS。
-
-**质疑**：20-80 个学生的 pilot，真的需要这些吗？
-
-- **PostgreSQL**：SQLite 完全可以支撑 pilot 阶段的并发。PostgreSQL 的价值在于 JSONB 和全文搜索，但 MVP 不需要。**pilot 用 SQLite，上线再切 PostgreSQL**。
-- **Redis**：ChromaDB 自带缓存。聊天实时性用不到 Redis 队列。**pilot 不需要**。
-- **OSS 对象存储**：本地文件系统 + 定时备份到云盘足够。**pilot 不需要**。
-
-**修正**：M3-M4 阶段用 **SQLite + 本地文件**，Docker Compose 只打包前端+后端+DB。用户量 > 100 且有付费意愿后再加 PostgreSQL + Redis。
-
-### 0.5 Citation Store 应优先引用 Examiner Report 而非 Syllabus
-
-**PDF 说**：Citation Store 存 syllabus 片段、公式表、学校讲义。
-
-**质疑**：Syllabus 只告诉你"考什么"，不告诉你"怎么得分"。对学生最有价值的引用是：
-1. **Mark Scheme 原文**：精确到「这个词值 1 分」
-2. **Examiner Report 原文**：考官说「大多数学生在这里犯的错误是...」
-3. **Syllabus**：仅用于 topic mapping，不作为学生可见的引用
-
-**修正**：Citation Store 的 seed 优先用 examiner report 和 mark scheme 中的关键句子，而非 syllabus 段落。
-
-### 0.6 作业切题：PDF 高估了成本，可以放进 M3
-
-**PDF 说**：Tencent 试卷切题 ¥0.24/次，试题批改 ¥0.15/题，容易超预算。
-
-**实际核实**（[腾讯云计费页](https://cloud.tencent.com/document/product/866/17619)）：试卷切题按 **页** 计费 ¥0.24，不是按题。一份 4 页的作业 = ¥0.96 切题费。试题批改 Agent ¥0.15/题是另一个产品。PDF 将两者混淆了。
-
-**修正**：之前我建议「Pilot 不做自动切题」可以改为「M3 接入腾讯试卷切题 API 做自动切题 + PaddleOCR 做免费 fallback」。¥0.24/页的成本在 pilot 阶段完全可以接受。PaddleOCR layout detection 也可以免费做切题（但精度较低）。
-
-### 0.7 已验证的判断（PDF 正确，保持）
-
-以下 PDF 的判断经过调证，确认正确：
-
-- ✅ **Hint-First 教学策略**：EEF 教育研究确实支持 metacognitive prompting。正确。
-- ✅ **窄 Agentic 架构**：对 ¥50 预算来说，工具路由远优于多 Agent 协作。正确。
-- ✅ **OCR 分阶段**：先 CV 预处理→便宜 OCR→低置信才 VLM。正确且已在 `ocr_pipeline.py` 实现。
-- ✅ **Bilingual 三模式**：中文优先/英文优先/Exam English。正确。
-- ✅ **error_logs 是最重要的日志**：从 day 1 记录错因，后续错题本和用户画像才有数据基础。正确。
+| 判断 | 验证源 | 状态 |
+|------|--------|------|
+| DeepSeek V4-Flash 数学能力 | [DeepSeek官方HF](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash) — HMMT 94.8%, IMOAnswerBench 88.4%, CMath 93.6% | ✅ 确认 |
+| DeepSeek V4-Flash vs Qwen 成本效率 | [ominigate.ai](https://ominigate.ai/en/vs/deepseek-v4-flash-vs-qwen3-6-max-preview) — 25x more cost-efficient per AA index point | ✅ 确认 |
+| DeepSeek V4 幻觉率 | [artificialanalysis.ai](https://artificialanalysis.ai/articles/deepseek-is-back-among-the-leading-open-weights-models-with-v4-pro-and-v4-flash) — 94-96% hallucination rate | ⚠️ 关键风险 |
+| Qwen-Flash / Qwen3-VL-Flash 免费 | [阿里百炼官方价格页](https://help.aliyun.com/zh/model-studio/model-pricing) — ¥0/M input/output with 100万Token free | ✅ 确认 |
+| PP-FormulaNet_plus-L 精度 | [arxiv 2503.18382](https://ar5iv.labs.arxiv.org/html/2503.18382) — 92.22% En-BLEU, 90.64% Zh-BLEU, trained on exam papers/textbooks | ✅ 确认 |
+| PaddleOCR-VL-1.5 文档解析 SOTA | OmniDocBench综合第一(38/40), [腾讯云评测文章](https://cloud.tencent.com/developer/article/2633039) | ✅ 确认 |
+| DECIMER 化学 OCR 精度 | [WildMol benchmark](https://arxiv.org/html/2605.05832) — 56% WildMol, 88% clean images; MolScribe 66% WildMol | ✅ 确认 |
+| 化学结构识别 SOTA | [ChemVA 2026](https://arxiv.org/html/2605.17214v1) + [GTR-VL 2025](https://arxiv.org/pdf/2506.07553) — functional-group-level perception 是下一代方向 | ✅ 确认 |
+| Gradio Server = FastAPI + 前端自由 | [HuggingFace blog 2026-04](https://huggingface.co/blog/introducing-gradio-server) — `gradio.Server` extends FastAPI, supports custom frontend | ✅ 确认 |
+| 腾讯 OCR 真实成本 | [腾讯云计费页](https://cloud.tencent.com/document/product/866/17619) — 通用OCR ¥0.15/次+1000次/月免费, 试卷切题 ¥0.24/页, 数学公式 ¥0.15/次 | ✅ 确认 |
 
 ---
 
-## 零-B、与 PDF 方案的对齐检查
+## 一、整体策略：6 周 → Pilot
 
-PDF 方案的核心设计决策，本计划严格遵循：
+**核心洞察**：从搜索验证结果看，这个项目的关键是**分层路由 + 免费工具最大化 + VLM 按需调用**。不要被 PDF 方案的 Web 全栈计划拖慢——用 Gradio 先出可用的 Web 界面。
 
-| PDF 决策 | 本计划对齐 |
-|----------|----------|
-| **窄 Agentic**（一个 Orchestrator 路由工具链，不做多 Agent 辩论） | ✅ `agent/core.py` 已实现 tool-calling 路由 |
-| **Hint-First** 教学（先提示，学生试过再给完整答案） | ✅ `agent/prompts.py` 四段式回答强制这个顺序 |
-| **Bilingual UX**（中文优先/英文优先/Exam English 三种模式） | ✅ Phase 4 Web 前端明确三种模式 |
-| **Citation-Backed**（所有回答可溯源到考纲/公式/讲义） | ⚠️ Citation Store 需要 seed（Phase 0 P0） |
-| **OCR before Vision**（先便宜 OCR，低置信才走 VLM fallback） | ✅ `agent/ocr_pipeline.py` + `agent/content_types.py` 路由 |
-| **数据最小化**（PIPL 合规，EXIF 去除，PII 分离） | ⚠️ Phase 6 安全审查 + Phase 0 P0（EXIF stripping） |
-| **¥20/月预算**（短提示、缓存、批处理、按需生成完整答案） | ✅ Phase 6 BudgetGuard |
-| **第一科从 9709 Math 开始**（符号性强，评分标准明确） | ✅ Phase 0 单科先行 |
+### 为什么是 6 周而不是 8 周
 
----
+PDF 方案预计 6-8 周，但考虑了从零搭建 Next.js 前端的时间。实际上：
 
-## 一、当前状态 & 与 PDF P0 清单的差距
+1. **Gradio Server** 可以在 1 天内搭建一个带聊天、上传、流式输出的 Web App（对比 Next.js 需要 1-2 周）
+2. **PP-FormulaNet_plus 和 PaddleOCR-VL-1.5** 是现成的免费 SOTA 方案（不需要像之前以为的那样组合多工具调参）
+3. **DeepSeek V4-Flash thinking mode** 一个模型覆盖所有文字辅导需求（不需要为数学/化学/物理分别选模型）
 
-PDF 第 26 页的 **立即执行清单**，逐项对照：
+### 为什么这个项目有可能成功
 
-| PDF P0 任务 | 我们完成了吗 | 状态 |
-|------------|-----------|------|
-| 确定首个 demo 科目（建议 9709 Mathematics），选 50 道代表题 | ❌ | 需要做 |
-| 搭建 Next.js + FastAPI + Postgres + Redis，Docker Compose 一键启动 | ❌ | 当前只有 CLI，需要 Phase 4-5 |
-| 接入百炼 OpenAI-compatible API（text chat + OCR + VLM fallback） | ⚠️ | 代码写了，API key 没配，没实测 |
-| 完成 Citation Store seed（每科至少 20-40 条考纲/概念/公式片段） | ❌ | None — 需要从 syllabus PDF 提取 |
-| 实现 `/questions/parse`（图片上传后返回 CanonicalQuestion JSON） | ⚠️ | `ocr_pipeline.py` 写了框架，没实测 |
+**三个被低估的优势**：
+1. **DeepSeek V4-Flash reasoning content** 暴露推理过程 → 学生可以看到完整的解题步骤，这是教学的黄金素材
+2. **PP-FormulaNet_plus 训练数据包含 textbooks/exam papers** → 公式识别是专门为教育场景训练的，不是通用 OCR
+3. **免费额度足够 pilot** → Qwen-Flash + Qwen3-VL-Flash + PaddleOCR 全部免费 → pilot 0 成本启动
 
-| PDF P1 任务 | 状态 |
-|------------|------|
-| 实现 hint-first 和 full solution（每次回答结构稳定，带引用芯片） | ⚠️ 提示词写了，引用芯片没配 Citation Store |
-| 实现 grading JSON（分数、置信度、错误、下一步建议、错因标签） | ⚠️ vision.py 返回自由格式文本，未结构化 |
-| 建立 eval set（每科至少 20 题，后续扩到 50+） | ❌ None |
-
-| PDF P2 任务 | 状态 |
-|------------|------|
-| 实现成本日志和限流（每个用户、route、model 成本估算） | ❌ None |
-| 母校 pilot 准备（演示账号、反馈表、隐私说明） | ❌ None |
+**三个不可忽视的风险**：
+1. **DeepSeek V4 94% 幻觉率** → 不确定时也会给出答案 → 必须用 RAG + citation 约束
+2. **化学结构 OCR 没有可靠的免费方案** → DECIMER/MolScribe 在真实场景精度 < 70% → 需要多引擎 + 人工确认
+3. **手写数学 OCR 精度 < 60%** → 学生手写作业批改可能是最大的体验问题 → 需要诚实降级策略
 
 ---
 
-## 二、分阶段计划（对齐 PDF 四个里程碑）
+## 二、分周计划
 
-### Milestone 1：单科可用的骨架（Week 1-2）
+### Week 1-2：核心闭环（文字 + 图片 + 批改，单科 9709 Math）
 
-**对应 PDF 原文**："sign-in, uploads, text tutoring, and a single subject working end-to-end. Start with 9709 Mathematics."
+**目标**：9709 Math 一条完整链路→ OCR → tutor → grade，在 Gradio Web 界面上跑通。
 
-**目标**：9709 Math 一条完整链路跑通。
+| # | 任务 | 完成标准 |
+|---|------|---------|
+| W1.1 | 修复 `ocr_pipeline.py` — 替换 Surya 为 PP-FormulaNet_plus-L | Math formula OCR BLEU > 85% |
+| W1.2 | 集成 PaddleOCR-VL-1.5 统一文档解析（文字+表格+公式） | 一张试卷页 → 结构化 JSON < 3秒 |
+| W1.3 | 接入 DeepSeek V4-Flash API（thinking mode） | 一次 API 调用返回 `reasoning_content` + `content` |
+| W1.4 | 实现 hint-first 教学 → full solution 两步流 | 学生看到：巧提示 → 自己试 → 完整解答 |
+| W1.5 | 实现 grading JSON（四维评分 40/35/15/10） | 批改输出结构化 JSON 而非自由文本 |
+| W1.6 | 搭建 Gradio Server Web App | ChatInterface + 图片上传 + 流式输出 |
+| W1.7 | 准备 50 道 9709 Math 金标题，跑通全流程 | 每道题记录：OCR精度、回答质量、批改误差 |
+| W1.8 | 写 W1 测试报告 | `plans/week1_report.md` |
 
-| # | 任务 | 参考 PDF 页 | 完成标准 |
-|---|------|-----------|---------|
-| **M1.1** | 配置所有 API Key（DEEPSEEK + ZHIPU/QWEN + MATHPIX 可选） | p.18 | `.env` 文件加载，`agent/config.py` 检测通过 |
-| **M1.2** | 安装全部 OCR 依赖并下载模型 | p.13 | `PaddleOCR`、`surya-ocr`、`DECIMER` import 成功，首次加载完成 |
-| **M1.3** | 选 50 道 9709 Math 代表题（P1 纯数 + P4 力学 + P5 统计各 15-20 题） | p.26 | 50 题清单：题目 PDF 页面截图 + 标准答案 + marking 要点 |
-| **M1.4** | 修复 `ocr_pipeline.py` 已知 bug → 对 50 道题逐一跑 OCR | p.10 | 每题输出 CanonicalQuestion JSON，记录每类内容的 OCR 精度 |
-| **M1.5** | 实现 `/questions/parse` API（图片→结构化 JSON） | p.9 | FastAPI endpoint 返回 CanonicalQuestion |
-| **M1.6** | 构建 Citation Store seed（9709 考纲 + 公式表 + 概念） | p.10-11 | 每 topic 至少 5 条 snippet，总计 40+ 条 |
-| **M1.7** | 验证 9709 Math 文字问答 + 图片问答完整回路 | p.4 | 50 题跑通：上传→OCR→结构化→LLM提示→完整答案→引用来源 |
-| **M1.8** | 实现结构化 grading JSON（分数/置信度/错误/错因tag） | p.13 | 批改输出严格 JSON 格式，不是自由文本 |
-| **M1.9** | 写 M1 测试报告 | — | `plans/milestone1_report.md`：OCR 精度表、bug 清单、每条链路的成功率 |
+**W2 退出标准**：50 道数学题上传→OCR→hint→full solution→grade 全流程 > 80% 成功率。
 
-**M1 退出标准**：
-- 9709 Math 50 道题 OCR→回答→批改 全流程跑通率 > 80%
-- CanonicalQuestion JSON 格式稳定
-- Citation Store 有 40+ 条 snippet，回答中出现引用 chip
-- 批改输出结构化 JSON（不是自由文本）
+### Week 3：扩展到 4 科
 
----
+**目标**：4 科图片题都能 OCR，引用系统上线，低置信降级就绪。
 
-### Milestone 2：图片解析 + 引用 + 低置信处理（Week 3-4）
+| # | 任务 | 完成标准 |
+|---|------|---------|
+| W3.1 | 加入 PP-FormulaNet_plus 中文数学公式模式 | 中英文公式混合识别测试通过 |
+| W3.2 | 加入 DECIMER + MolScribe 双引擎化学结构 OCR | 每种结构至少一个引擎能正确输出 SMILES |
+| W3.3 | 化学机理图（卷曲箭头）→ Qwen3-VL 语义判断 + 保留原图 | 机理题不尝试自动提取，给 VLM 描述 |
+| W3.4 | 经济学图表 → Qwen3-VL 解释 + PaddleOCR 轴标签 | 供需图/AD-AS/弹性图识别正确率 > 80% |
+| W3.5 | 物理电路/力/波图 → Qwen3-VL 描述 | 图类型识别正确率 > 85% |
+| W3.6 | Citation Store seed — 4 科 × 30=120 条 snippet | 优先 examiner report + mark scheme 关键句 |
+| W3.7 | OCR 置信度分级 → 降级提示 | <0.5 诚实说「看不清，请重拍或手动输入」 |
+| W3.8 | 写 W3 测试报告 | `plans/week3_report.md` |
 
-**对应 PDF 原文**："image parsing, citation rendering, and low-confidence handling. The key success metric is not 'AI impressiveness.' It is whether the system gracefully says 'I cannot read this clearly enough' rather than inventing certainty."
+**W3 退出标准**：4 科各 20 题 OCR，低置信率 < 20%。引用 chip 出现在每个正式答案末尾。
 
-**目标**：4 科图片题都能处理，低置信诚实降级。
+### Week 4：批改校准 + 数据库
 
-| # | 任务 | 参考 PDF 页 | 完成标准 |
-|---|------|-----------|---------|
-| **M2.1** | 扩展到 4 科：每科准备 20 张测试图 | p.9 | 80 张测试图覆盖全部 30 种内容类型 |
-| **M2.2** | 实现内容路由器（根据 subject + 关键词选择 OCR 引擎） | p.10 | 化学结构走 DECIMER、数学公式走 Surya、文字走 PaddleOCR、图表走 Qwen3-VL |
-| **M2.3** | 实现 OCR 置信度分级 + 降级提示 | p.9 | >0.85 direct，0.5-0.85 confirm then answer，<0.5 "图片不清晰，请重拍或手动输入" |
-| **M2.4** | 图片预处理流水线（crop/deskew/compress/EXIF strip） | p.10 | 所有上传图片默认走 OpenCV 预处理；EXIF 自动去除 |
-| **M2.5** | 手写识别专项（真实手写作业 30 份测试） | p.4 | OCR 置信度分布记录；低置信触发「重拍」而非硬猜 |
-| **M2.6** | Citation Store 扩充到 4 科 | p.10-11 | 每科 20-40 条 snippet，总计 100+ 条 |
-| **M2.7** | 答案引用芯片渲染（前端或 CLI 输出中显示考纲来源） | p.11 | `📎 9709 §Integration` 格式的引用出现在每个正式答案末尾 |
-| **M2.8** | 建立 Eval Set（每科 20 题金标） | p.22 | 每题有：题目图、标准答案、真人评分、expected misconception tags |
-| **M2.9** | 批改评分校准 | p.21-22 | AI 评分 vs 真人评分 MAE < 0.5/4，相关性 > 0.85 |
-| **M2.10** | 写 M2 测试报告 | — | `plans/milestone2_report.md` |
+**目标**：批改和真人评分对标，错题日志入库。
 
-**M2 退出标准**：
-- 4 科图片 OCR 跑通率 > 80%
-- 低置信图片准确提示「无法识别」率 > 90%（不硬猜）
-- Citation Store 100+ snippet，回答引用覆盖率 > 80%
-- 批改校准通过 MAE 和相关性阈值
+| # | 任务 | 完成标准 |
+|---|------|---------|
+| W4.1 | 批改校准 — 每科 20 题金标题 vs 真人评分 | MAE < 0.5/4，相关性 > 0.85 |
+| W4.2 | SQLite 数据模型（users, questions, answers, error_logs 等 6 表） | 迁移成功，读写正常 |
+| W4.3 | error_logs 自动记录（error_family + error_atom） | 每次批改自动写入错因标签 |
+| W4.4 | 对话持久化 — 刷新可看历史 | Gradio ChatInterface 重启后加载历史 |
+| W4.5 | 成本日志 + BudgetGuard | 每次 API 调用记录 model/tokens/cost |
+| W4.6 | 写 W4 测试报告 | `plans/week4_report.md` |
 
----
+### Week 5-6：Pilot 准备 + 上线
 
-### Milestone 3：作业批改 + 错题日志（Week 5-6）
+**目标**：安全合规、Docker 打包、邀请学生试用。
 
-**对应 PDF 原文**："homework batch correction for all four subjects, plus the logging needed for the future wrong-question notebook and user profiling."
-
-**目标**：多题作业批改、错题数据入库。
-
-| # | 任务 | 参考 PDF 页 | 完成标准 |
-|---|------|-----------|---------|
-| **M3.1** | PostgreSQL 数据模型实现（6 张表） | p.14-17 | users, questions, answers, annotations, error_logs, usage_events 建表+迁移 |
-| **M3.2** | 用户注册/登录 API | p.9 | email+password（JWT），支持删除和导出 |
-| **M3.3** | 对话持久化 | p.14-15 | 每次问答写入 answers 表，刷新后可查看历史 |
-| **M3.4** | 错题日志记录（error_logs 表 — PDF 强调「最重要的未来规划」） | p.16-17 | 每次批改自动写入 error_family + error_atom + severity + evidence_json |
-| **M3.5** | 作业切题流水线（一张图多道题→拆成独立题目） | p.10 | 轮廓检测 + 题号识别 → 每道题单独处理 |
-| **M3.6** | Homework batch correction（提交整页作业→返回每题批改结果） | p.10 | Queue status: Ready / Needs better image / Low confidence / Reviewed |
-| **M3.7** | 答案输出模板标准化（按题型区分） | p.13 | MCQ: 选项+排除逻辑; 计算: 公式→working→boxed answer; 解释: 因果链; Essay: 定义→论证→评估→结论 |
-| **M3.8** | 批改权重实现（Correctness 40%, Method 35%, Represent 15%, Comm 10%） | p.13-14 | grading JSON 的 `rubric_json` 字段包含 4 维分项评分 |
-| **M3.9** | 写 M3 测试报告 | — | `plans/milestone3_report.md` |
-
-**M3 退出标准**：
-- 6 张表全部建好，迁移运行成功
-- 登录/注册/对话持久化正常
-- error_logs 表持续记录，每条有 error_family + error_atom
-- 作业切题准确率 > 70%（低置信题进 review queue）
-- 批改按 4 维度输出分项评分
+| # | 任务 | 完成标准 |
+|---|------|---------|
+| W5.1 | 内容安全过滤 + prompt injection 防护 | 违禁词库 + 文件白名单 |
+| W5.2 | EXIF 去除 + PII 分离 | 上传图片自动去元数据 |
+| W5.3 | 隐私合规（账号删除/导出） | PIPL 基础合规通过 |
+| W5.4 | Docker Compose 打包 | `docker-compose up` 一键启动 |
+| W5.5 | 准备 5-10 名学生试用 | 演示账号 + 反馈问卷 |
+| W5.6 | README + 演示视频 | 3-5 分钟展示全流程 |
+| W5.7 | 写 Pilot 总结报告 | `plans/pilot_report.md` |
 
 ---
 
-### Milestone 4：校准 + 成本控制 + 安全（Week 7-8）
+## 三、技术决策总表
 
-**对应 PDF 原文**："prompt trimming, model routing, version pinning, and budget envelopes."
+### 模型路由
 
-**目标**：生产可运维，成本可控，安全合规。
+| 任务 | 模型 | 价格 | 原因 |
+|------|------|------|------|
+| 文字辅导（主力） | DeepSeek V4-Flash (thinking=high) | $0.14/$0.28/M | HMMT 94.8%, CMath 93.6%, 1M context, 导出 reasoning_content |
+| 文字辅导（轻量） | Qwen-Flash | 免费 | 概念解释、简单提示 |
+| 复杂推理 | DeepSeek V4-Flash (thinking=max) | 同上 | 被难住的题才升到 max |
+| 视觉图表理解 | Qwen3-VL-Flash | 免费 | 基础图表识别 |
+| OCR 文档解析 | PaddleOCR-VL-1.5 | 免费自部署 | 文字+表格+公式一体化，OmniDocBench SOTA |
+| 数学公式 OCR | PP-FormulaNet_plus-L | 免费自部署 | 92.22% En-BLEU，专门训练于考试/教材 |
+| 化学结构 OCR | DECIMER + MolScribe 双引擎 | 免费自部署 | DECIMER 56% WildMol, MolScribe 66% — 互补 |
+| 视觉 fallback | Qwen-VL-OCR 或 GLM-4V-Plus | ¥1-5/M | 低置信时才调用 |
+| 手写文本 | PaddleOCR handwriting model | 免费自部署 | 中文 85%+, 英文数字 OK |
+| 批改评分 | DeepSeek V4-Flash (thinking=high) | 同上 | 四维评分 JSON 输出 |
 
-| # | 任务 | 参考 PDF 页 | 完成标准 |
-|---|------|-----------|---------|
-| **M4.1** | 实现 UsageLogger + BudgetGuard | p.19-20 | 每次 API 调用记录 model/tokens/成本估算；日预算超额自动降级 |
-| **M4.2** | 成本 Dashboard | p.20 | 前端展示本月用量/预算比，按 route 分拆 |
-| **M4.3** | Prompt/Rubric/Model 版本化 | p.22-23 | 每次批改日志写入 `prompt_version`, `rubric_version`, `model_id` |
-| **M4.4** | 跨平台 API 健康检查 + 自动降级 | p.8 | 阿里不可用→腾讯 fallback→纯文本降级 |
-| **M4.5** | 内容安全过滤（prompt injection 防护、恶意文件扫描） | p.22 | 违禁词库 + 文件类型白名单 + 大小限制 |
-| **M4.6** | 隐私合规（PIPL：账号删除/导出、PII 分离、cookie 同意） | p.22-23 | 删除账号=级联删除所有上传图和日志；EXIF 自动去除 |
-| **M4.7** | 批处理任务（夜间走 batch inference 半价） | p.20 | 错题总结、周报走 batch pipeline |
-| **M4.8** | Docker Compose 一键部署 | p.7 | `docker-compose up` 启动全部服务（前端+后端+DB+Redis） |
-| **M4.9** | 写 README.md + 架构图 | — | 项目介绍、快速开始、API 文档、架构图 |
-| **M4.10** | 写 M4 测试报告 | — | `plans/milestone4_report.md` |
+### 已废弃的方案
 
-**M4 退出标准**：
-- 日 API 成本可追踪到 ±10%
-- BudgetGuard 在超 80% 预算时降级
-- prompt/rubric/model 版本号写入每笔日志
-- 隐私合规 checklist 通过
-- Docker Compose 一键启动全部服务
-- README 可读
-
----
-
-## 三、Web 前端计划（与 M2-M4 并行）
-
-| 页面 | 功能 | 对应 PDF | 完成里程碑 |
-|------|------|---------|----------|
-| `/` | Landing page：功能展示 + 登录 | p.7 | M2 |
-| `/app` | 聊天区、上传区、科目选择、语言模式 | p.3-4 | M2 |
-| `/question/<id>` | 题目图、OCR 结果、提示、答案、引用 chips | p.11 | M2 |
-| `/grade/<id>` | 评分卡片（4 维分项）、错因标签、改进建议 | p.13-14 | M3 |
-| `/homework` | 作业上传→切题→批改进度队列 | p.10 | M3 |
-| `/history` | 最近题目、按科目筛选 | p.21 | M3 |
-| `/settings` | 语言模式、API 额度、数据删除/导出 | p.22-23 | M4 |
-| `/dashboard` | 成本监控、学习概览 | p.20 | M4 |
-
-**三种语言模式**（PDF p.3-4）：
-- **中文优先**：讲解用中文，学科关键词/公式/command words 保留英文
-- **英文优先**：解释用英文，关键处加中文注释
-- **Exam English**：全英文，模拟考试环境
-- **Hover Gloss**：鼠标悬停英文关键词显示中文解释
+| 原方案 | 废弃原因 |
+|--------|---------|
+| Surya LaTeX OCR 做主公式引擎 | PP-FormulaNet_plus 精度更高（92% vs ~85%），且训练数据包含教育场景 |
+| Qwen2.5-Math-7B 做数学批改 | DeepSeek V4-Flash 数学更强 + 更便宜 + 省一个模型调用 |
+| 阿里百炼为单一提供商 | DeepSeek 无视觉能力，必须多源 |
+| Next.js 从零写前端（Phase 4） | Gradio Server 1 天出 Web，Next.js 留到要商业化时 |
+| PostgreSQL + Redis + OSS | SQLite + 本地文件 pilot 完全够用 |
 
 ---
 
-## 四、CanonicalQuestion Schema（PDF p.8-9）
+## 四、关键设计
+
+### 4.1 DeepSeek V4 幻觉率 94% 的应对
+
+**问题**：DeepSeek V4 不确定时几乎总是给出答案（而不是说「不确定」）。
+
+**方案**：
+1. **所有正式答案必须带 citation chip**（强制引用来源，没有来源就不该输出确信答案）
+2. **RAG 检索优先**：先搜教材/真题，用检索到的内容约束 LLM 输出
+3. **低置信标记**：如果检索结果和 LLM 输出不一致，标记低置信
+4. **Examiner Report 优先引用**：ER 里的答案经过了真实考试验证，比 LLM 自由生成可靠
+
+### 4.2 代价：DeepSeek V4-Flash thinking 的 reasoning tokens
+
+DeepSeek thinking mode 会额外产生 4,000-15,000 个 reasoning tokens（不计入 `content` 输出而是独立的 `reasoning_content` 字段）。这增加成本但也提供了解题过程的完整可视化。**保留 reasoning_content 对学生展示解题步骤**，这是产品竞争力。
+
+### 4.3 CanonicalQuestion 更新（加入 depends_on）
 
 ```json
 {
-  "question_id": "q_9709_2022_p1_001",
-  "subject": "9709",
-  "question_type": "structured_calculation",
-  "language_mode": "zh_first",
-  "stem_text": "A block rests on a smooth plane inclined at 30°...",
   "subparts": [
-    { "label": "(a)", "marks": 2, "target_skill": "resolve_forces",
-      "depends_on": null, "carry_forward": false },
-    { "label": "(b)", "marks": 4, "target_skill": "use_suvat",
+    {
+      "label": "(a)", "marks": 3, "target_skill": "resolve_forces",
+      "expected_answer": {"value": 4.9, "unit": "m/s²", "tolerance": 0.1},
+      "depends_on": null, "carry_forward": false
+    },
+    {
+      "label": "(b)", "marks": 4, "target_skill": "use_suvat",
       "depends_on": "(a)", "carry_forward": true,
-      "ft_note": "FT from (a) accepted" }
-  ],
-  "table_regions": [],
-  "diagram_regions": [
-    { "bbox": [120, 88, 420, 360], "kind": "diagram",
-      "description": "Block on inclined plane" }
-  ],
-  "formula_regions": [
-    { "bbox": [460, 102, 700, 220], "latex": "F = ma",
-      "confidence": 0.95 }
-  ],
-  "handwriting_regions": [],
-  "ocr_confidence": 0.93,
-  "source_refs": ["9709_mechanics_component"],
-  "needs_visual_reasoning": false,
-  "needs_manual_review": false
+      "ft_note": "FT from (a) accepted — award method marks if method correct"
+    }
+  ]
 }
 ```
 
-## 五、Grading Rubric（PDF p.13-14）
+### 4.4 输出分级策略
 
-| 维度 | 权重 | 检查要点 |
-|------|------|---------|
-| **Correctness** | 40% | 最终答案数值/结论是否正确 |
-| **Method / Reasoning** | 35% | 公式选择、代入步骤、逻辑链（Math/Phys/Chem 最关键） |
-| **Representation** | 15% | 单位、有效数字、图表标签、符号书写规范 |
-| **Communication** | 10% | 解释清晰度、essay 结构（Econ 权重更高） |
+| 用户动作 | LLM 调用 | 输出长度 | 预估 cost |
+|---------|---------|---------|-----------|
+| 拿到提示 (hint) | DeepSeek thinking=off | ~200 tokens | ¥0.001 |
+| 请求完整答案 | DeepSeek thinking=high | ~1,500 tokens | ¥0.005 |
+| 提交批改 | DeepSeek thinking=high + grading JSON | ~800 tokens | ¥0.004 |
+| 图片题（OCR） | PaddleOCR-VL-1.5 (免费) | — | ¥0 |
+| 图片题（视觉 fallback） | Qwen3-VL-Flash (免费) | — | ¥0 |
+| 单题总成本 | — | — | **¥0.001-0.010** |
 
-批改 JSON 输出：
-```json
-{
-  "score_awarded": 7,
-  "score_max": 10,
-  "confidence": 0.88,
-  "verdict": "Partially correct — method right but unit error in (b)",
-  "rubric_scores": {
-    "correctness": 2.5, "method": 3.2,
-    "representation": 0.8, "communication": 0.5
-  },
-  "strengths": ["Correct formula selection", "Clear working steps"],
-  "mistakes": ["Unit: used kg instead of g in (b)"],
-  "misconception_tags": ["units", "carelessness"],
-  "next_step": "Practice unit conversions: always convert to SI before substituting",
-  "citations": ["9709 §Mechanics", "Formula Sheet M1"]
-}
-```
+---
 
-## 六、数据模型（PDF p.14-17，对齐）
-
-6 张核心表 + 1 张引用表：
-
-```
-users               — 账号、语言偏好
-assets              — 上传图片/PDF 原始文件
-questions           — CanonicalQuestion JSON（题目主表）
-answers             — 每次 AI 回答/批改结果
-annotations         — 图片区域标注（bbox/公式/图表/手写区域）
-error_logs          — 错因日志（error_family + error_atom + evidence）⭐ 最重要
-source_snippets     — Citation Store 引用片段
-usage_events        — 每次 API 调用的 token/cost 日志
-```
-
-**error_logs 表字段**（PDF 强调这是整个项目最有价值的日志）：
-- `error_family`: concept / method / algebra / units / diagram_reading / essay_structure / translation / carelessness
-- `error_atom`: 具体标签如 `forgot_moles_ratio`、`used_g_not_gsinθ`
-- `severity`: 1-5
-- `evidence_json`: {snippet, region_ref, rubric_ref}
-
-## 七、外部依赖引入清单
-
-| M# | 新引入依赖 | 用途 |
-|-----|-----------|------|
-| M1 | `paddleocr`, `surya-ocr`, `DECIMER`, `fastapi`, `uvicorn` | OCR + API 服务 |
-| M1 | `python-dotenv` | .env 文件加载 |
-| M3 | `sqlalchemy`/`sqlmodel`, `alembic`, `asyncpg` | 数据库 |
-| M3 | `python-jose`, `passlib`, `bcrypt` | JWT + 密码哈希 |
-| M4 | `docker-compose` | 容器化部署 |
-| M4 | `Pillow` (已有), `opencv-python-headless` | 图片预处理 |
-| Web | `next.js`, `react`, `typescript`, `tailwind`, `shadcn/ui` | 前端 |
-
-## 八、总时间线（8 周 → Pilot）
-
-```
-Week 1-2  │ M1: 9709 Math 单科骨架
-          │  ├─ API key 配置 + 依赖安装
-          │  ├─ 50 题 eval set + OCR 跑通
-          │  ├─ /questions/parse API
-          │  ├─ Citation Store seed
-          │  └─ 端到端验证
-          │
-Week 3-4  │ M2: 4 科图片解析 + 引用
-          │  ├─ OCR 置信度分级 + 降级
-          │  ├─ Citation Store 扩充 100+ snippet
-          │  ├─ 批改校准（vs 真人评分）
-          │  └─ Web 前端 /app 页面
-          │
-Week 5-6  │ M3: 作业批改 + 数据库
-          │  ├─ PostgreSQL 6 表 + 迁移
-          │  ├─ 登录/注册 + 对话持久化
-          │  ├─ 作业切题 + 批改流水线
-          │  ├─ error_logs 错因记录
-          │  └─ Web 前端 /grade /homework /history
-          │
-Week 7-8  │ M4: 校准 + 安全 + 部署
-          │  ├─ BudgetGuard + 成本 Dashboard
-          │  ├─ 版本化（prompt/rubric/model）
-          │  ├─ 安全合规审查
-          │  ├─ Docker Compose 部署
-          │  └─ README + 架构图
-
-Week 9-10 │ Pilot: 5-10 名真实学生试用
-```
-
-## 九、今天立即执行（Phase 0 / M1 启动）
+## 五、立即执行
 
 ```bash
-# 1. 环境配置
-echo "DEEPSEEK_API_KEY=sk-xxx" > .env
-echo "ZHIPU_API_KEY=xxx" >> .env
-echo "DASHSCOPE_API_KEY=xxx" >> .env  # 备用
+# 1. 配 API Key
+export DEEPSEEK_API_KEY=sk-xxx
+export ZHIPU_API_KEY=xxx        # 备用视觉
 
-# 2. 安装依赖
-pip install paddleocr surya-ocr fastapi uvicorn python-dotenv Pillow
+# 2. 安装核心依赖
+pip install paddleocr paddlepaddle gradio fastapi uvicorn python-dotenv
 
-# 3. 修复已知 bug
-# - agent/ocr_pipeline.py: Surya API 调用方式修正
-# - agent/ocr_pipeline.py: DECIMER import 路径确认
-# - agent/ocr_pipeline.py: PPStructure 参数修正
-# - agent/core.py: grade_homework_image tool 真正调用 vision
+# 3. 下载 PaddleOCR 模型（首次需等待）
+python3 -c "from paddleocr import PaddleOCR; ocr = PaddleOCR(lang='en')"
 
-# 4. 准备 9709 Math 50 道 eval 题
-python3 build_kb.py --subject 9709 --max-papers 20
+# 4. 修复 ocr_pipeline.py
+#    - 替换 Surya → PP-FormulaNet_plus
+#    - 添加 DECIMER + MolScribe 双引擎
+#    - 添加置信度分级 + 降级逻辑
 
-# 5. 验证端到端
-python3 chat.py --subject 9709
+# 5. 启动 Gradio Web App
+python3 app.py   # 待创建 — Gradio Server 聊天界面
+
+# 6. 准备 50 道 9709 Math 金标题
+#    从 data/past_papers/9709_mathematics/ 选 P1/P4/P5 各 15-20 题
+#    每题有：题目图 + 标准答案 + 评分 rubric
 ```
 
 ---
 
-**参考 PDF**：`plans/Agentic Tutor MVP for Chinese A-Level Students.pdf`（英文 v1）和 `plans/agentic_tutor_zh_report.pdf`（中文 v2）。本计划是这两个方案的可执行版本。
+## 六、不做的事（明确排除）
+
+| 不做 | 原因 | 何时做 |
+|------|------|--------|
+| Next.js 前端 | Gradio Server 1 天出，Next.js 留到商业化 | v1.0 之后 |
+| PostgreSQL / Redis / OSS | SQLite + 本地文件 pilot 够用 | 用户 > 100 且有付费 |
+| 作业自动切题 | 腾讯 ¥0.24/页 可用但加了复杂度 | v1.1 |
+| 用户画像 / 智能推荐 | 先验证核心教学功能 | v1.2 |
+| 语音输入 / TTS | 与核心教学无关 | v2.0 |
+| 多 Agent 协作 | 工具路由就够了 | 永远不必要 |
+| 自主出题 | 先做好「学生来问→给出好回答」 | v1.0 之后 |

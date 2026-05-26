@@ -9,7 +9,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Build A-Level Tutor Knowledge Base")
     parser.add_argument("--subject", type=str, choices=["9701", "9702", "9708", "9709"], help="Only index specific subject")
-    parser.add_argument("--max-papers", type=int, default=50, help="Max past papers per subject to index")
+    parser.add_argument("--max-per-type", type=int, default=10, help="Max PDFs per paper type per subject (qp, ms, er)")
     args = parser.parse_args()
 
     print("=" * 50)
@@ -38,4 +38,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print()
-    build_all(args.subject, args.max_papers)
+    build_all(args.subject, args.max_per_type)

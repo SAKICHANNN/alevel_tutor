@@ -68,6 +68,9 @@ def search_past_papers(
         where_filter["topic"] = topic
     if not where_filter:
         where_filter = None
+    elif len(where_filter) > 1:
+        # ChromaDB requires $and for multiple filter operators
+        where_filter = {"$and": [{k: v} for k, v in where_filter.items()]}
 
     results = collection.query(
         query_texts=[query],

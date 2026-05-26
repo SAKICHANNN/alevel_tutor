@@ -184,8 +184,12 @@ def build_textbook_kb(subject_code: Optional[str] = None):
     return total_chunks
 
 
-def build_paper_kb(max_papers_per_subject: int = 50):
-    """Index past paper content into ChromaDB (sample subset)."""
+def build_paper_kb(max_per_type: int = 10):
+    """Index past paper content into ChromaDB (balanced across qp/ms/er/gt/ci types).
+    
+    Args:
+        max_per_type: max PDFs per paper type per subject (e.g. 10 qp + 10 ms = 20 per subject)
+    """
     client = _get_client()
     embedding_fn = _get_embedding_fn()
 
@@ -214,15 +218,22 @@ def build_paper_kb(max_papers_per_subject: int = 50):
         if not subject_dir.exists():
             continue
 
-        pdf_count = 0
+        # Count per type, not total — ensures qp, ms, er all get indexed
+        type_counts = {}
+        paper_count = 0
+
         for year_dir in sorted(subject_dir.iterdir(), reverse=True):
             if not year_dir.is_dir():
                 continue
             for type_dir in year_dir.iterdir():
                 if not type_dir.is_dir():
                     continue
+                type_name = type_dir.name
+                if type_name not in type_counts:
+                    type_counts[type_name] = 0
+
                 for pdf_file in type_dir.glob("*.pdf"):
-                    if pdf_count >= max_papers_per_subject:
+                    if type_counts[type_name] >= max_per_type:
                         break
                     if pdf_file.stat().st_size < 10000:
                         continue
@@ -249,14 +260,16 @@ def build_paper_kb(max_papers_per_subject: int = 50):
                         )
                         total_chunks += 1
 
-                    pdf_count += 1
+                    type_counts[type_name] += 1
+                    paper_count += 1
                     if total_chunks % 100 == 0:
                         console.print(f"  [dim]...{total_chunks} chunks indexed[/dim]")
 
-            if pdf_count >= max_papers_per_subject:
+            if all(v >= max_per_type for v in type_counts.values()) and len(type_counts) >= 3:
                 break
 
-        console.print(f"  [green]{code}: {pdf_count} papers indexed[/green]")
+        type_breakdown = ", ".join(f"{t}:{c}" for t, c in sorted(type_counts.items()))
+        console.print(f"  [green]{code}: {paper_count} papers ({type_breakdown})[/green]")
 
     console.print(f"\n[bold green]Past Paper KB built: {total_chunks} chunks total[/bold green]")
     return total_chunks
@@ -307,13 +320,13 @@ def build_technique_kb():
     return total
 
 
-def build_all(subject_code: Optional[str] = None, max_papers: int = 50):
+def build_all(subject_code: Optional[str] = None, max_per_type: int = 10):
     """Build all knowledge bases."""
     console.print("[bold]Building Knowledge Bases...[/bold]\n")
     console.print("[cyan]1/3[/cyan] Indexing textbooks...")
     tb = build_textbook_kb(subject_code)
-    console.print("\n[cyan]2/3[/cyan] Indexing past papers...")
-    pp = build_paper_kb(max_papers)
+    console.print("\n[cyan]2/3[/cyan] Indexing past papers (balanced: qp/ms/er/gt)...")
+    pp = build_paper_kb(max_per_type)
     console.print("\n[cyan]3/3[/cyan] Indexing exam techniques...")
     te = build_technique_kb()
     console.print(f"\n[bold green]Done! {tb} textbook + {pp} paper + {te} technique chunks indexed.[/bold green]")

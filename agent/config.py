@@ -10,6 +10,20 @@ from typing import Optional, List
 
 PROJECT_ROOT = Path(__file__).parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
+
+# Load .env if exists
+def _load_dotenv():
+    env_file = PROJECT_ROOT / ".env"
+    if env_file.exists():
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, _, val = line.partition("=")
+                    key, val = key.strip(), val.strip().strip('"').strip("'")
+                    if key not in os.environ:
+                        os.environ[key] = val
+_load_dotenv()
 CHROMA_DIR = DATA_DIR / "chroma_db"
 TEXTBOOK_DIR = DATA_DIR / "textbooks"
 PAPERS_DIR = DATA_DIR / "past_papers"

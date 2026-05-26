@@ -189,7 +189,7 @@ class OCRCache:
 # ── PaddleOCR Engine ──
 
 class PaddleOCREngine:
-    """PaddleOCR wrapper for Chinese + English text OCR."""
+    """PaddleOCR wrapper for Chinese + English text OCR (v3.x API)."""
 
     def __init__(self):
         self._ocr = None
@@ -199,18 +199,20 @@ class PaddleOCREngine:
         if self._ocr is None:
             try:
                 from paddleocr import PaddleOCR
-                self._ocr = PaddleOCR(lang='en', use_angle_cls=True, show_log=False)
+                self._ocr = PaddleOCR(lang='en')
             except ImportError:
                 console.print("[yellow]PaddleOCR not installed. pip install paddleocr[/yellow]")
                 self._ocr = None
         return self._ocr
 
     def extract_text(self, image_data: bytes) -> list:
-        """Extract text regions from image. Returns [{bbox, text, confidence}]."""
         if self.ocr is None:
             return [{"bbox": [0, 0, 0, 0], "text": "[PaddleOCR not available]", "confidence": 0}]
-        img = io.BytesIO(image_data)
-        results = self.ocr.ocr(img.read(), cls=True)
+        import numpy as np
+        from PIL import Image
+        img = Image.open(io.BytesIO(image_data))
+        arr = np.array(img)
+        results = self.ocr.ocr(arr)
         if not results or not results[0]:
             return []
         return [
@@ -224,56 +226,91 @@ class PaddleOCREngine:
         ]
 
     def extract_tables(self, image_data: bytes) -> list:
-        """Extract tables using PP-StructureV3."""
+        """Extract tables using PPStructureV3 (PaddleOCR 3.x)."""
         try:
-            from paddleocr import PPStructure
-            engine = PPStructure(table=True, layout=False, show_log=False)
-            img = io.BytesIO(image_data)
-            results = engine(img.read())
+            from paddleocr import PPStructureV3
+            engine = PPStructureV3()
+            import numpy as np
+            from PIL import Image
+            img = Image.open(io.BytesIO(image_data))
+            arr = np.array(img)
+            results = engine(arr)
             tables = []
             for item in results:
-                if item.get('type') == 'table':
+                item_type = item.get('type', '')
+                if 'table' in str(item_type).lower():
                     tables.append({
-                        "bbox": item.get('bbox', [0, 0, 0, 0]),
+                        "bbox": list(item.get('bbox', [0, 0, 0, 0])),
                         "html": item.get('res', {}).get('html', ''),
-                        "confidence": item.get('confidence', 0),
+                        "markdown": item.get('res', {}).get('markdown', ''),
+                        "confidence": float(item.get('confidence', 0)),
                     })
             return tables
         except ImportError:
+            return []
+        except Exception as e:
+            console.print(f"[dim]PPStructureV3 failed: {e}[/dim]")
             return []
 
 
 # ── Formula / LaTeX OCR Engines ──
 
 class FormulaOCREngine:
-    """Formula OCR using Surya LaTeX + MathPix API fallback."""
+    """Formula OCR using PP-FormulaNet_plus-L (PaddleOCR) + MathPix API fallback."""
 
     def __init__(self):
-        self._surya = None
+        self._formula_ocr = None
+        self._init_attempted = False
 
-    def extract_formulas(self, image_data: bytes) -> list:
-        """Extract LaTeX formulas from image. Falls back to MathPix if available."""
-        results = self._try_surya(image_data)
-        if not results:
-            results = self._try_mathpix(image_data)
-        return results
-
-    def _try_surya(self, image_data: bytes) -> list:
+    def _init_pp_formulanet(self) -> bool:
+        if self._init_attempted:
+            return self._formula_ocr is not None
+        self._init_attempted = True
         try:
-            # Only import and initialize on first use
-            if self._surya is None:
-                from PIL import Image
-                from surya.texify import TexifyPredictor
-                self._surya = TexifyPredictor()
-
-            img = io.BytesIO(image_data)
-            result = self._surya(img)
-            if result and hasattr(result, 'text'):
-                return [{"latex": result.text, "confidence": getattr(result, 'confidence', 0.8)}]
+            from paddleocr import FormulaRecognition
+            self._formula_ocr = FormulaRecognition(
+                model_name="PP-FormulaNet-S"
+            )
+            console.print("[dim]PP-FormulaNet-S loaded[/dim]")
+            return True
         except ImportError:
-            pass
+            console.print("[yellow]paddleocr not installed. pip install paddleocr[/yellow]")
         except Exception as e:
-            console.print(f"[dim]Surya formula OCR failed: {e}[/dim]")
+            console.print(f"[dim]PP-FormulaNet init skipped: {e}[/dim]")
+        return False
+
+    def _try_pp_formulanet(self, image_data: bytes) -> list:
+        if not self._init_pp_formulanet() or self._formula_ocr is None:
+            return []
+        try:
+            import numpy as np
+            from PIL import Image
+            img = Image.open(io.BytesIO(image_data))
+            arr = np.array(img)
+            result = self._formula_ocr(arr)
+            if result:
+                tex = str(result) if isinstance(result, str) else result.get("formula", str(result))
+                conf = 0.8
+                if isinstance(result, dict):
+                    conf = result.get("confidence", 0.8)
+                    tex = result.get("formula", str(result))
+                if tex and len(tex) > 1:
+                    return [{"latex": tex, "confidence": conf}]
+        except Exception as e:
+            console.print(f"[dim]PP-FormulaNet OCR failed: {e}[/dim]")
+        return []
+        try:
+            result = self._formula_ocr.predict(
+                image_data,
+                batch_size=1,
+            )
+            if result:
+                tex = result.get("formula", "")
+                conf = result.get("confidence", 0.8)
+                if tex:
+                    return [{"latex": tex, "confidence": conf}]
+        except Exception as e:
+            console.print(f"[dim]PP-FormulaNet OCR failed: {e}[/dim]")
         return []
 
     def _try_mathpix(self, image_data: bytes) -> list:
@@ -305,27 +342,41 @@ class FormulaOCREngine:
 # ── Chemistry Structure OCR ──
 
 class ChemistryOCREngine:
-    """Chemistry structure recognition using DECIMER."""
+    """Chemistry structure recognition using DECIMER. Falls back gracefully."""
 
     def __init__(self):
-        self._decimer_loaded = False
+        self._decimer = None
+        self._init_attempted = False
+
+    def _init_decimer(self) -> bool:
+        if self._init_attempted:
+            return self._decimer is not None
+        self._init_attempted = True
+        # DECIMER can be imported in different casing
+        for mod_name in ["DECIMER", "decimer"]:
+            try:
+                mod = __import__(mod_name, fromlist=["predict_SMILES"])
+                self._decimer = mod.predict_SMILES
+                console.print(f"[dim]DECIMER loaded via '{mod_name}'[/dim]")
+                return True
+            except ImportError:
+                continue
+        console.print("[yellow]DECIMER not installed. Chemistry OCR disabled.[/yellow]")
+        return False
 
     def extract_structure(self, image_data: bytes) -> Optional[dict]:
-        """Extract SMILES from chemical structure image."""
+        if not self._init_decimer() or self._decimer is None:
+            return None
         try:
-            from DECIMER import predict_SMILES
             from PIL import Image
-
             img = Image.open(io.BytesIO(image_data))
-            smiles = predict_SMILES(img)
-            if smiles:
+            smiles = self._decimer(img)
+            if smiles and isinstance(smiles, str) and len(smiles) > 1:
                 return {
-                    "smiles": smiles,
+                    "smiles": str(smiles),
                     "method": "decimer",
-                    "confidence": 0.75  # DECIMER doesn't provide confidence
+                    "confidence": 0.70
                 }
-        except ImportError:
-            pass
         except Exception as e:
             console.print(f"[dim]DECIMER failed: {e}[/dim]")
         return None

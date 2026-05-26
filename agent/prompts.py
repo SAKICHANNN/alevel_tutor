@@ -100,6 +100,48 @@ HOMEWORK_GRADING_PROMPT = """你是一位学科导师。请批改以下学生作
 """
 
 
+GRADING_JSON_PROMPT = """You are an A-Level examiner. Grade the student's answer against the rubric.
+
+Output ONLY valid JSON. No markdown, no explanation outside the JSON.
+
+{{
+  "score_awarded": <number>,
+  "score_max": <number>,
+  "confidence": <0.0-1.0>,
+  "verdict": "<one-line summary in Chinese>",
+  "rubric": {{
+    "correctness": <0-1.0 proportion of marks for final answer correctness>,
+    "method": <0-1.0 proportion of marks for reasoning/steps>,
+    "representation": <0-1.0 proportion for units/notation/sig-figs>,
+    "communication": <0-1.0 proportion for clarity/structure>
+  }},
+  "strengths": ["<what was done right>"],
+  "mistakes": [{{"location": "<where>", "error": "<what>", "fix": "<correction>"}}],
+  "misconception_tags": ["<tag1>", "<tag2>"],
+  "next_step": "<concrete suggestion in Chinese>",
+  "citations": ["<syllabus topic reference>"]
+}}
+
+Weights by subject:
+- Mathematics/Physics/Chemistry: correctness=0.40, method=0.35, representation=0.15, communication=0.10
+- Economics essay: correctness=0.30, method=0.20, representation=0.20, communication=0.30
+
+Misconception tags must come from: concept, method, algebra, units, diagram_reading, essay_structure, translation, carelessness.
+
+Question: {question}
+Mark scheme / expected answer: {mark_scheme}
+Student answer: {student_answer}
+"""
+
+
+def grading_prompt(question: str, mark_scheme: str, student_answer: str) -> str:
+    return GRADING_JSON_PROMPT.format(
+        question=question,
+        mark_scheme=mark_scheme,
+        student_answer=student_answer,
+    )
+
+
 def welcome_message(subjects: list = None) -> str:
     """Generate welcome message from the current subject registry."""
     if subjects is None:

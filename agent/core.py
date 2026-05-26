@@ -280,6 +280,31 @@ class Agent:
         ]
         self.current_subject = None
 
+    def grade(self, question: str, mark_scheme: str, student_answer: str) -> dict:
+        """Grade a student answer against a mark scheme. Returns structured JSON."""
+        from .prompts import grading_prompt
+
+        prompt = grading_prompt(question, mark_scheme, student_answer)
+        messages = [
+            {"role": "system", "content": "You are an A-Level examiner. Output valid JSON only. No markdown, no explanation."},
+            {"role": "user", "content": prompt},
+        ]
+
+        try:
+            resp = self._call_llm(messages, model_key="fast")
+            content = resp["choices"][0]["message"]["content"]
+            content = content.strip().removeprefix("```json").removesuffix("```").strip()
+            return json.loads(content)
+        except (json.JSONDecodeError, KeyError) as e:
+            console.print(f"[yellow]Grading JSON parse failed: {e}[/yellow]")
+            return {
+                "score_awarded": 0, "score_max": 0, "confidence": 0.0,
+                "verdict": "评分系统出错，请重试",
+                "rubric": {}, "strengths": [], "mistakes": [],
+                "misconception_tags": ["system_error"],
+                "next_step": "请重新提交批改", "citations": [],
+            }
+
     def set_subject(self, subject_code: str):
         s = SUBJECT_BY_CODE.get(subject_code)
         if s:

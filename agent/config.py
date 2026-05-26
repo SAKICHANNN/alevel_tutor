@@ -24,6 +24,10 @@ def _load_dotenv():
                     if key not in os.environ:
                         os.environ[key] = val
 _load_dotenv()
+
+# HuggingFace mirror for China access (set before any HF imports)
+if not os.environ.get("HF_ENDPOINT"):
+    os.environ["HF_ENDPOINT"] = os.getenv("HF_ENDPOINT", "https://hf-mirror.com")
 CHROMA_DIR = DATA_DIR / "chroma_db"
 TEXTBOOK_DIR = DATA_DIR / "textbooks"
 PAPERS_DIR = DATA_DIR / "past_papers"

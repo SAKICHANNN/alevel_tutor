@@ -1,0 +1,57 @@
+{
+  "board": "caie-alevel",
+  "subject_code": "9708",
+  "patterns": {
+    "econ_essay_20": {
+      "subject": "9708",
+      "topic": "20-Mark Essay Structure",
+      "question_recognition": [
+        "Paper 4 essay 题, 20 分",
+        "关键词: Discuss, Evaluate, Assess, To what extent"
+      ],
+      "answer_template": [
+        "Introduction (2-3 min): 定义关键词，重述论点",
+        "Core Analysis (10-12 min): 画图并解释（至少2个 diagram），2-3 个因果链条 (cause → mechanism → effect)",
+        "Impacts (7-8 min): 短期 vs 长期，对不同群体的影响",
+        "Evaluation (10-12 min): ← 最关键部分",
+        "  维度1: 弹性依赖（PED/PES 影响效果）",
+        "  维度2: 时间滞后（政策实施到见效有时间差）",
+        "  维度3: 假设限制（ceteris paribus 不成立）",
+        "  维度4: 意外后果",
+        "  提出替代方案",
+        "Conclusion (2-3 min): 做出有根据的判断，直接回答问题"
+      ],
+      "common_mistakes": [
+        "单方面论述 → 零分 evaluation",
+        "图画了但不解释 → 图画白画了",
+        "Diagram 不标轴、不标曲线、不标均衡点",
+        "结论不直接回答问题，只是总结"
+      ],
+      "keywords": [
+        "AO1 (33%): Knowledge — define, recall facts",
+        "AO2 (37%): Analysis — cause-and-effect chains",
+        "AO3 (30%): Evaluation — weigh arguments, reach judgement"
+      ]
+    },
+    "econ_data_response": {
+      "subject": "9708",
+      "topic": "Data Response Questions",
+      "question_recognition": [
+        "Paper 2 data response 题",
+        "有 extract/table/graph 提供数据"
+      ],
+      "answer_template": [
+        "Part (a): 直接从数据中提取/计算，引用具体数字",
+        "Part (b): 解释趋势/关系，画图并用数据支持",
+        "Part (c): 分析原因，2个以上的因果链，引用 extract",
+        "Part (d): 评估，双面论述，用数据支持，有结论",
+        "关键: 每部分都要引用 extract 中的具体数据！"
+      ],
+      "common_mistakes": [
+        "不引用数据/不引用 extract → 低分",
+        "只描述趋势不解释原因 → AO1 不是 AO2",
+        "Part (d) 只给单方面分析 → 不给 evaluation 分"
+      ]
+    }
+  }
+}

@@ -16,14 +16,14 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 
 from agent.core import Agent
-from agent.prompts import WELCOME_MESSAGE
-from agent.config import MODELS
+from agent.prompts import welcome_message
+from agent.config import MODELS, SUBJECTS, SUBJECT_BY_CODE
 
 console = Console()
 
 
 class TutorCLI(cmd.Cmd):
-    intro = WELCOME_MESSAGE
+    intro = welcome_message(SUBJECTS)
     prompt = "\n[bold cyan]你 > [/bold cyan]"
 
     def __init__(self):
@@ -62,12 +62,13 @@ class TutorCLI(cmd.Cmd):
     def do_subject(self, arg: str):
         """切换科目: subject 9701 / subject 9702 / subject 9708 / subject 9709"""
         arg = arg.strip()
-        valid = {"9701", "9702", "9708", "9709"}
+        valid = SUBJECT_BY_CODE
         if arg in valid:
             result = self.agent.set_subject(arg)
             console.print(f"[green]{result}[/green]")
         else:
-            console.print(f"[yellow]用法: subject <code>  可选: 9701(化学) 9702(物理) 9708(经济) 9709(数学)[/yellow]")
+            codes = ", ".join(f"{c}({s.name})" for c, s in valid.items())
+            console.print(f"[yellow]用法: subject <code>  可选: {codes}[/yellow]")
 
     def do_grade(self, arg: str):
         """批改作业图片: grade <图片路径>"""

@@ -1,11 +1,12 @@
 """
-Multi-provider LLM configuration and routing.
-Supports: DeepSeek, ZhipuAI (GLM), Qwen (Alibaba)
+Multi-provider LLM configuration, subject registry, and routing.
+Supports CAIE A-Level, and designed to extend to IB, Edexcel, AQA, etc.
 """
 import os
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 PROJECT_ROOT = Path(__file__).parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
@@ -13,8 +14,9 @@ CHROMA_DIR = DATA_DIR / "chroma_db"
 TEXTBOOK_DIR = DATA_DIR / "textbooks"
 PAPERS_DIR = DATA_DIR / "past_papers"
 GUIDES_DIR = DATA_DIR / "study_guides"
+PATTERNS_DIR = DATA_DIR / "patterns"
 
-# ── API Keys (set via environment) ──
+# ── API Keys (set via environment or .env) ──
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 
@@ -35,9 +37,8 @@ class LLMConfig:
     max_tokens: int = 4096
 
 
-# ── Model Registry ──
+# Model Registry — latest model IDs as of 2026-05
 MODELS = {
-    # Text reasoning (primary tutor)
     "tutor": LLMConfig(
         provider="deepseek",
         model="deepseek-chat",
@@ -46,16 +47,14 @@ MODELS = {
         temperature=0.7,
         max_tokens=4096,
     ),
-    # Deep thinking for complex problems
     "reasoner": LLMConfig(
         provider="deepseek",
-        model="deepseek-reasoner",
+        model="deepseek-chat",
         api_key=DEEPSEEK_API_KEY,
         base_url=DEEPSEEK_BASE_URL,
         temperature=0.3,
         max_tokens=8192,
     ),
-    # Fast/cheap for simple tasks
     "fast": LLMConfig(
         provider="deepseek",
         model="deepseek-chat",
@@ -64,7 +63,6 @@ MODELS = {
         temperature=0.1,
         max_tokens=1024,
     ),
-    # Vision (homework grading, diagram analysis)
     "vision": LLMConfig(
         provider="zhipu",
         model="glm-4v-plus",
@@ -73,7 +71,6 @@ MODELS = {
         temperature=0.3,
         max_tokens=2048,
     ),
-    # Alternative vision provider
     "vision_qwen": LLMConfig(
         provider="qwen",
         model="qwen-vl-max",
@@ -86,7 +83,6 @@ MODELS = {
 
 
 def get_active_vision_model() -> LLMConfig:
-    """Return the first available vision model."""
     for key in ["vision", "vision_qwen"]:
         config = MODELS[key]
         if config.api_key:
@@ -102,3 +98,75 @@ def get_active_tutor() -> LLMConfig:
             "or DASHSCOPE_API_KEY environment variable."
         )
     return cfg
+
+
+# ═══════════════════════════════════════════════════════════
+# Subject Registry — parameterized for multiple exam boards
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class Subject:
+    """A subject within an exam board. Future-proof: add IB, Edexcel, AQA, etc."""
+    board: str           # "caie-alevel", "caie-igcse", "ib-dp", "edexcel-ial", "aqa-alevel"
+    code: str            # "9701", "0620", "chem-hl", "WCH11"
+    name: str            # "Chemistry", "Physics"
+    level: str = "A-Level"  # "AS", "A-Level", "IGCSE", "HL", "SL"
+
+    @property
+    def display_name(self) -> str:
+        labels = {
+            "caie-alevel": "CAIE AS & A Level",
+            "caie-igcse": "CAIE IGCSE",
+            "ib-dp": "IB Diploma",
+            "edexcel-ial": "Edexcel IAL",
+            "aqa-alevel": "AQA A-Level",
+        }
+        board_label = labels.get(self.board, self.board)
+        return f"{board_label} {self.name} ({self.code})"
+
+    @property
+    def pattern_file(self) -> Path:
+        return PATTERNS_DIR / f"{self.board}_{self.code}.json"
+
+    @property
+    def prompt_context(self) -> dict:
+        """Returns a dict for prompt template interpolation."""
+        labels = {
+            "caie-alevel": "Cambridge International AS & A Level",
+            "caie-igcse": "Cambridge IGCSE",
+            "ib-dp": "International Baccalaureate Diploma",
+            "edexcel-ial": "Edexcel International A Level",
+            "aqa-alevel": "AQA A Level",
+        }
+        return {
+            "board_full": labels.get(self.board, self.board),
+            "board_short": self.board,
+            "code": self.code,
+            "name": self.name,
+            "level": self.level,
+        }
+
+
+# Current active subjects (the 4 we support in MVP)
+SUBJECTS: List[Subject] = [
+    Subject(board="caie-alevel", code="9701", name="Chemistry"),
+    Subject(board="caie-alevel", code="9702", name="Physics"),
+    Subject(board="caie-alevel", code="9708", name="Economics"),
+    Subject(board="caie-alevel", code="9709", name="Mathematics"),
+]
+
+# Quick lookup
+SUBJECT_BY_CODE: dict[str, Subject] = {s.code: s for s in SUBJECTS}
+
+
+def register_subject(board: str, code: str, name: str, level: str = "A-Level") -> Subject:
+    """Add a new subject at runtime (e.g. for future expansion)."""
+    s = Subject(board=board, code=code, name=name, level=level)
+    if code not in SUBJECT_BY_CODE:
+        SUBJECTS.append(s)
+        SUBJECT_BY_CODE[code] = s
+    return s
+
+
+def ensure_dirs():
+    PATTERNS_DIR.mkdir(parents=True, exist_ok=True)

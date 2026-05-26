@@ -1,0 +1,85 @@
+{
+  "board": "caie-alevel",
+  "subject_code": "9702",
+  "patterns": {
+    "phys_kinematics": {
+      "subject": "9702",
+      "topic": "Kinematics / SUVAT",
+      "question_recognition": [
+        "关键词: displacement, velocity, acceleration, time, suvat, projectile",
+        "常见问法: \"Calculate the...\" / \"Find the time taken...\""
+      ],
+      "answer_template": [
+        "Step 1: 列出已知量和未知量 (s, u, v, a, t)",
+        "Step 2: 选择不包含未知量的 SUVAT 方程",
+        "Step 3: 代入数值（注意方向！向上设为+，向下设为-）",
+        "Step 4: 解方程",
+        "Step 5: 选符合物理意义的答案（如时间不能为负）"
+      ],
+      "common_mistakes": [
+        "选错方程（用了包含两个未知量的方程）",
+        "忘记设定正方向，符号错乱",
+        "投掷运动中忘记加速度始终是 g=9.81 向下",
+        "单位转换错误（km→m, cm→m）"
+      ],
+      "keywords": [
+        "v = u + at",
+        "s = ut + ½at²",
+        "v² = u² + 2as",
+        "s = ½(u+v)t"
+      ]
+    },
+    "phys_paper5": {
+      "subject": "9702",
+      "topic": "Paper 5: Planning, Analysis, Evaluation",
+      "question_recognition": [
+        "关键词: plan, experiment, variable, graph, uncertainty, improve",
+        "Paper 5 专属题型"
+      ],
+      "answer_template": [
+        "Planning:",
+        "  1. 列出 Independent / Dependent / Controlled variables（各3个）",
+        "  2. 列出器材并说明用途",
+        "  3. 写步骤（足够详细，别人能复现）",
+        "  4. 说明如何分析数据（画什么图，y=mx+c 形式，如何提取需要的量）",
+        "  5. 安全注意事项（具体的，不是 \"小心实验\"）",
+        "Analysis:",
+        "  1. 表格：每列有单位/不确定性",
+        "  2. 画图：标轴+单位，点占 >50% 网格，画最佳拟合线",
+        "  3. 算 gradient + y-intercept（展示三角形法）",
+        "  4. 画 worst acceptable line，算不确定性",
+        "Evaluation:",
+        "  1. 结论：回答实验目的",
+        "  2. 指出局限性：具体的问题（不说 \"human error\"）",
+        "  3. 改进建议：具体行动（不说 \"be more careful\"）"
+      ],
+      "common_mistakes": [
+        "Improvement 太泛（\"use better equipment\" 没分）",
+        "忘了算 uncertainty",
+        "表格里不写单位",
+        "安全建议太泛（\"wear goggles\" 不够具体）"
+      ]
+    },
+    "phys_circuits": {
+      "subject": "9702",
+      "topic": "Electric Circuits / Kirchhoff's Laws",
+      "question_recognition": [
+        "关键词: circuit, current, voltage, resistance, Kirchhoff, potential divider",
+        "常见问法: \"Calculate the current through...\" / \"Explain why...\""
+      ],
+      "answer_template": [
+        "Step 1: 标注电路中已知的电流方向",
+        "Step 2: 应用 Kirchhoff 第一定律 (junction rule): ΣI_in = ΣI_out",
+        "Step 3: 应用 Kirchhoff 第二定律 (loop rule): ΣV = 0 绕一圈",
+        "Step 4: 用 V=IR 将电压转为电流×电阻",
+        "Step 5: 解联立方程"
+      ],
+      "common_mistakes": [
+        "符号方向搞反",
+        "并联电阻公式用错: 1/R_total = 1/R₁ + 1/R₂",
+        "忘了 internal resistance",
+        "LDR/thermistor 电阻随光/温度变化的趋势记反"
+      ]
+    }
+  }
+}

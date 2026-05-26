@@ -1,5 +1,6 @@
 """
 Core agent: multi-provider LLM routing, tool calling, conversation management.
+Uses parameterized subject system — add new boards/subjects via JSON config.
 """
 import json
 import re
@@ -11,8 +12,8 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from .config import get_active_tutor, get_active_vision_model, MODELS
-from .prompts import SYSTEM_PROMPT, WELCOME_MESSAGE
+from .config import get_active_tutor, get_active_vision_model, MODELS, SUBJECTS, SUBJECT_BY_CODE
+from .prompts import system_prompt, welcome_message
 from .retriever import search_textbooks, search_past_papers, get_collection_stats
 from .patterns import get_pattern, format_pattern_for_prompt, PATTERNS
 from .vision import grade_homework, analyze_diagram
@@ -87,9 +88,13 @@ TOOLS = [
 
 
 class Agent:
-    def __init__(self):
+    def __init__(self, subjects: list = None):
+        self.subjects = subjects or SUBJECTS
+        self._subjects_summary = " · ".join(
+            f"{s.code} {s.name}" for s in self.subjects
+        )
         self.conversation = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt(self._subjects_summary)},
         ]
         self.current_subject = None
 
@@ -161,29 +166,39 @@ class Agent:
                 return f"该科目暂无此 topic 的套路模板。可用通用考试技巧：先识别题型→回忆相关公式/概念→分步骤解答→检查单位和有效数字。"
 
         elif tool_name == "grade_homework_image":
-            return "图片批改功能需要学生直接上传图片。请提示学生使用 `/grade <图片路径>` 命令。"
+            return "图片批改功能需要学生直接上传图片。请提示学生使用 `/grade <图片路径>` 命令。也可直接在聊天中附上图片。"
+
+        elif tool_name == "get_subject_info":
+            subject_code = arguments.get("subject_code", "")
+            s = SUBJECT_BY_CODE.get(subject_code)
+            if s:
+                return f"{s.display_name} — 考试局: {s.board}, 级别: {s.level}"
+            return f"科目代码 {subject_code} 不在当前支持列表中。"
 
         else:
             return f"Unknown tool: {tool_name}"
 
     def _detect_subject(self, text: str) -> Optional[str]:
-        """Detect subject from text keywords."""
+        """Detect subject from text keywords — uses current subject registry."""
         text_lower = text.lower()
-        subject_keywords = {
-            "9701": ["化学", "chemistry", "chem", "mole", "equilibrium", "organic", "enthalpy", "titration", "periodic table", "bond", "electro", "9701"],
-            "9702": ["物理", "physics", "phys", "velocity", "force", "energy", "circuit", "wave", "magnetic", "kinetic", "momentum", "9702"],
-            "9708": ["经济", "economics", "econ", "demand", "supply", "inflation", "gdp", "market", "fiscal", "monetary", "elasticity", "9708"],
-            "9709": ["数学", "math", "maths", "integr", "differenti", "calculus", "algebra", "trig", "vector", "matrix", "9709", "equation", "function"],
-        }
         scores = {}
-        for code, keywords in subject_keywords.items():
-            score = sum(1 for kw in keywords if kw in text_lower)
+        for s in self.subjects:
+            score = 0
+            # code match
+            if s.code in text:
+                score += 5
+            # name match (English + Chinese)
+            name_map = {
+                "9701": ["chemistry", "chem", "化学", "mole", "equilibrium", "organic", "enthalpy", "titration", "periodic", "bond"],
+                "9702": ["physics", "phys", "物理", "velocity", "force", "circuit", "wave", "momentum"],
+                "9708": ["economics", "econ", "经济", "demand", "supply", "inflation", "market", "elasticity"],
+                "9709": ["mathematics", "math", "maths", "数学", "integr", "differenti", "calculus", "algebra", "trig", "vector"],
+            }
+            keywords = name_map.get(s.code, [s.name.lower()])
+            score += sum(1 for kw in keywords if kw in text_lower)
             if score > 0:
-                scores[code] = score
-
-        if scores:
-            return max(scores, key=scores.get)
-        return None
+                scores[s.code] = score
+        return max(scores, key=scores.get) if scores else None
 
     def chat(self, user_input: str, image_path: Optional[str] = None) -> str:
         """Process a chat message with optional image."""
@@ -261,21 +276,17 @@ class Agent:
 
     def reset(self):
         self.conversation = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt(self._subjects_summary)},
         ]
         self.current_subject = None
 
     def set_subject(self, subject_code: str):
-        subject_names = {
-            "9701": "Chemistry",
-            "9702": "Physics",
-            "9708": "Economics",
-            "9709": "Mathematics",
-        }
-        self.current_subject = subject_code
-        name = subject_names.get(subject_code, subject_code)
-        self.conversation.append({
-            "role": "system",
-            "content": f"当前科目已切换到: {name} ({subject_code})",
-        })
-        return f"已切换到 {name} ({subject_code})"
+        s = SUBJECT_BY_CODE.get(subject_code)
+        if s:
+            self.current_subject = subject_code
+            self.conversation.append({
+                "role": "system",
+                "content": f"当前科目已切换到: {s.display_name}",
+            })
+            return f"已切换到 {s.display_name}"
+        return f"未找到科目: {subject_code}"

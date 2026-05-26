@@ -1,0 +1,93 @@
+{
+  "board": "caie-alevel",
+  "subject_code": "9701",
+  "patterns": {
+    "chem_equilibrium": {
+      "subject": "9701",
+      "topic": "Chemical Equilibrium / Le Chatelier's Principle",
+      "question_recognition": [
+        "关键词: equilibrium, shift, increase/decrease, pressure, temperature, concentration, catalyst",
+        "常见问法: \"Explain what happens when...\" / \"State and explain the effect of...\"",
+        "Paper 2/4 的结构题或选择题"
+      ],
+      "answer_template": [
+        "Step 1: 说出条件变化是什么 (e.g. temperature increased)",
+        "Step 2: 说出平衡向哪个方向移动 (left/right, endothermic/exothermic direction)",
+        "Step 3: 解释为什么会移动 (The system opposes the change by...)",
+        "Step 4: 说明结果 (e.g. yield of product increases/decreases)",
+        "Step 5: 如果是催化剂: 只加速到达平衡的速度，不改变平衡位置！"
+      ],
+      "common_mistakes": [
+        "只说 \"equilibrium shifts to the left/right\" 不解释为什么",
+        "催化剂忘了说 \"does not affect position of equilibrium\"",
+        "增加压力时应该看气体的摩尔数（moles of gas）而不是所有物质",
+        "温度变化时要根据 ΔH 判断是 exothermic 还是 endothermic 方向"
+      ],
+      "keywords": [
+        "Le Chatelier's principle: system opposes the change",
+        "Kc: only affected by temperature",
+        "Catalyst: speeds up forward AND backward equally"
+      ],
+      "analogy": "舞池比喻：舞池满了，新来一群人挤进来 → 大家往旁边空房间移动。条件变化 = 新进来的人；平衡移动 = 人群重新分布。"
+    },
+    "chem_organic_mechanisms": {
+      "subject": "9701",
+      "topic": "Organic Reaction Mechanisms",
+      "question_recognition": [
+        "关键词: mechanism, curly arrow, electrophilic, nucleophilic, SN1, SN2",
+        "常见问法: \"Draw the mechanism for...\" / \"Describe the mechanism of...\"",
+        "出现在 Paper 2/4"
+      ],
+      "answer_template": [
+        "Step 1: 识别反应类型 (electrophilic addition / nucleophilic substitution / etc.)",
+        "Step 2: 画出完整的 displayed formula（展示所有原子和键）",
+        "Step 3: 用卷曲箭头 (curly arrows) 画电子移动",
+        "  - 箭头必须从孤对电子(lone pair)或键的中间开始",
+        "  - 箭头必须指向原子或要形成的键",
+        "Step 4: 标出所有中间体的电荷",
+        "Step 5: 如果有 intermediate (如 carbocation)，画出来"
+      ],
+      "common_mistakes": [
+        "卷曲箭头从碳原子开始（应该从键/孤对电子开始）",
+        "忘了画中间体上的电荷",
+        "SN1 vs SN2 混淆: SN1=两步+carbocation；SN2=一步+inversion",
+        "忘了画 dipole (δ+ δ-)"
+      ],
+      "keywords": [
+        "Electrophile: electron-deficient, accepts electron pair",
+        "Nucleophile: electron-rich, donates electron pair",
+        "SN1: 2 steps, carbocation intermediate, racemisation",
+        "SN2: 1 step, inversion of configuration"
+      ]
+    },
+    "chem_calculations": {
+      "subject": "9701",
+      "topic": "Stoichiometry & Mole Calculations",
+      "question_recognition": [
+        "关键词: calculate, moles, mass, volume, concentration, limiting reagent, yield",
+        "常见问法: \"Calculate the mass of...\" / \"Determine the limiting reagent\""
+      ],
+      "answer_template": [
+        "Step 1: 写出配平的化学方程式",
+        "Step 2: 计算每种已知物质的 moles (n = m/M 或 n = cV 或 n = V/24)",
+        "Step 3: 用 mole ratio 找 limiting reagent",
+        "Step 4: 计算产物的 theoretical yield",
+        "Step 5: 如果需要 percentage yield: (actual / theoretical) × 100",
+        "全过程中不要四舍五入！只在最后答案四舍五入到 3 s.f."
+      ],
+      "common_mistakes": [
+        "中间步骤四舍五入导致最终答案偏差",
+        "忘记配平方程式就用 mole ratio",
+        "限性试剂判断错误",
+        "单位不一致 (cm³ vs dm³, g vs kg)",
+        "3 s.f. 和 3 d.p. 混淆"
+      ],
+      "keywords": [
+        "n = m/M (moles = mass / molar mass)",
+        "n = cV (moles = concentration × volume in dm³)",
+        "Gas at RTP: 1 mol = 24 dm³",
+        "Limiting reagent: the one that runs out first"
+      ]
+    }
+  }
+}

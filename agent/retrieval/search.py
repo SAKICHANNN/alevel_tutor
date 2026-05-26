@@ -177,12 +177,33 @@ def get_collection_stats() -> dict:
     stats = {}
     try:
         client = _get_or_create_db()
-        for name in ["textbooks", "past_papers"]:
+        for name in ["textbooks", "past_papers", "techniques"]:
             try:
                 col = client.get_collection(name)
                 stats[name] = {"count": col.count()}
             except Exception:
                 stats[name] = {"count": 0}
     except Exception:
-        stats = {"textbooks": {"count": 0}, "past_papers": {"count": 0}}
+        stats = {"textbooks": {"count": 0}, "past_papers": {"count": 0}, "techniques": {"count": 0}}
     return stats
+
+
+def search_techniques(query: str, subject_code: str = None, n_results: int = 3) -> list:
+    """Search exam techniques and study guides."""
+    client = _get_or_create_db()
+    try:
+        collection = client.get_collection("techniques")
+    except Exception:
+        return []
+
+    where_filter = None
+    if subject_code:
+        where_filter = {"subject": subject_code}
+
+    results = collection.query(
+        query_texts=[query],
+        n_results=n_results,
+        where=where_filter,
+        include=["documents", "metadatas", "distances"],
+    )
+    return _format_results(results, "techniques")

@@ -17,6 +17,7 @@ from agent.tutoring.prompts import system_prompt, welcome_message
 from agent.retrieval.search import search_textbooks, search_past_papers, get_collection_stats
 from agent.tutoring.patterns import get_pattern, format_pattern_for_prompt, PATTERNS
 from agent.ocr.vision import grade_homework, analyze_diagram
+from agent.retrieval.search import search_techniques as _search_techniques
 
 console = Console()
 
@@ -66,6 +67,21 @@ TOOLS = [
                     "topic_keywords": {"type": "string", "description": "题目关键词，如 'equilibrium' / 'integration' / 'essay'"},
                 },
                 "required": ["subject_code", "topic_keywords"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_exam_techniques",
+            "description": "搜索考试技巧和备考指南。包含 command words、常见错误、答题模板等结构化技巧。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "搜索关键词"},
+                    "subject_code": {"type": "string", "description": "科目代码: 9701/9702/9708/9709"},
+                },
+                "required": ["query"],
             },
         },
     },
@@ -167,6 +183,18 @@ class Agent:
 
         elif tool_name == "grade_homework_image":
             return "图片批改功能需要学生直接上传图片。请提示学生使用 `/grade <图片路径>` 命令。也可直接在聊天中附上图片。"
+
+        elif tool_name == "search_exam_techniques":
+            results = _search_techniques(
+                arguments.get("query", ""),
+                arguments.get("subject_code"),
+            )
+            if not results:
+                return "未找到匹配的考试技巧。请尝试更具体的问题。"
+            return "\n\n".join(
+                f"[考试技巧 {r['metadata'].get('filename','')}]\n{r['content'][:1200]}"
+                for r in results[:3]
+            )
 
         elif tool_name == "get_subject_info":
             subject_code = arguments.get("subject_code", "")

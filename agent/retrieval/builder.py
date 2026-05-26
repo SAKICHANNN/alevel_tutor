@@ -93,10 +93,12 @@ def _extract_text_from_pdf(pdf_path: Path) -> str:
 
 
 def _chunk_text(text: str, metadata: dict, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list:
-    """Split text into overlapping chunks with metadata."""
+    """Split text into overlapping chunks with metadata. Filters low-quality chunks."""
     chunks = []
     text = re.sub(r'\n{3,}', '\n\n', text)
     text = re.sub(r'[ \t]{3,}', '  ', text)
+    # Clean PDF artifacts
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
 
     sentences = re.split(r'(?<=[.!?])\s+', text)
     current = ""
@@ -104,19 +106,44 @@ def _chunk_text(text: str, metadata: dict, chunk_size: int = CHUNK_SIZE, overlap
         if len(current) + len(sent) < chunk_size:
             current += sent + " "
         else:
-            if current.strip():
+            if current.strip() and _is_quality_chunk(current, metadata.get("type", "")):
                 chunks.append({
                     "content": current.strip(),
                     "metadata": {**metadata, "chunk_length": len(current.strip())},
                 })
             current = current[-overlap:] if len(current) > overlap else ""
             current += sent + " "
-    if current.strip():
+    if current.strip() and _is_quality_chunk(current, metadata.get("type", "")):
         chunks.append({
             "content": current.strip(),
             "metadata": {**metadata, "chunk_length": len(current.strip())},
         })
     return chunks
+
+
+def _is_quality_chunk(text: str, paper_type: str = "") -> bool:
+    """Filter low-quality chunks: too short, mark-scheme-only codes, garbled text."""
+    # Minimum length
+    if len(text) < 80:
+        return False
+    # For mark schemes: filter annotation-heavy chunks
+    if paper_type == "ms":
+        code_lines = len(re.findall(r'(?:^|\s)[AMEBP]\d{1,2}\b', text))
+        mark_lines = len(re.findall(r'\[\d+\]', text))
+        alpha_ratio = sum(1 for c in text if c.isalpha()) / max(len(text), 1)
+        garbage_ratio = sum(1 for c in text if c in '\b') / max(len(text), 1)
+        # Reject if: too many scoring codes, too little alpha, garbled
+        if alpha_ratio < 0.40 or garbage_ratio > 0.01:
+            return False
+        if (code_lines + mark_lines) > 3 and alpha_ratio < 0.60:
+            return False
+    # Too much whitespace or non-printable chars
+    printable_ratio = sum(1 for c in text if c.isprintable() or c in '\n\t ') / max(len(text), 1)
+    if printable_ratio < 0.85:
+        return False
+    if len(text.strip()) / max(len(text), 1) < 0.3:
+        return False
+    return True
 
 
 def build_textbook_kb(subject_code: Optional[str] = None):

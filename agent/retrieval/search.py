@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import List, Optional
 
-from .config import CHROMA_DIR, PAPERS_DIR, TEXTBOOK_DIR
+from agent.config import CHROMA_DIR, PAPERS_DIR, TEXTBOOK_DIR
 
 _RESULTS_CACHE: dict = {}
 

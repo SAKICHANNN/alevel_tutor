@@ -17,7 +17,7 @@ from rich.console import Console
 from rich.progress import Progress, BarColumn, TextColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
 from rich.table import Table
 
-from .config import SUBJECTS, DATA_DIR
+from tools.crawler.config import SUBJECTS, DATA_DIR
 
 console = Console()
 

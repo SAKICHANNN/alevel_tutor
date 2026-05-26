@@ -6,7 +6,7 @@ from typing import List
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
-from .config import (
+from tools.crawler.config import (
     SUBJECTS,
     GITHUB_REPO_URL,
     GITHUB_BRANCH,

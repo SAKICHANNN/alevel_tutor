@@ -15,8 +15,8 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.syntax import Syntax
 
-from agent.core import Agent
-from agent.prompts import welcome_message
+from agent.tutoring.core import Agent
+from agent.tutoring.prompts import welcome_message
 from agent.config import MODELS, SUBJECTS, SUBJECT_BY_CODE
 
 console = Console()

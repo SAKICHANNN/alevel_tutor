@@ -1,9 +1,9 @@
 """
-A-Level Tutor Agent
+A-Level Tutor Agent — public API surface.
 """
-from .core import Agent
-from .config import MODELS, Subject, SUBJECTS, SUBJECT_BY_CODE, register_subject
-from .kb_builder import build_all
-from .retriever import get_collection_stats
-from .content_types import SUBJECT_CONTENT_TYPES, get_subject_types, get_p0_types
-from .ocr_pipeline import OCRPipeline, get_pipeline
+from agent.tutoring.core import Agent
+from agent.config import MODELS, Subject, SUBJECTS, SUBJECT_BY_CODE, register_subject
+from agent.retrieval.builder import build_all
+from agent.retrieval.search import get_collection_stats
+from agent.ocr.content_types import SUBJECT_CONTENT_TYPES, get_subject_types, get_p0_types
+from agent.ocr.pipeline import OCRPipeline, get_pipeline

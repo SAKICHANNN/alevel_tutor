@@ -3,9 +3,9 @@
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from crawler.textbooks import list_available, download_all, download_direct_pdfs
+from tools.crawler.textbooks import list_available, download_all, download_direct_pdfs
 
 
 def main():

@@ -9,8 +9,8 @@ from typing import Optional
 import requests
 from rich.console import Console
 
-from .config import MODELS, get_active_vision_model
-from .prompts import HOMEWORK_GRADING_PROMPT
+from agent.config import MODELS, get_active_vision_model
+from agent.tutoring.prompts import HOMEWORK_GRADING_PROMPT
 
 console = Console()
 

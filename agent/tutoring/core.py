@@ -12,11 +12,11 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from .config import get_active_tutor, get_active_vision_model, MODELS, SUBJECTS, SUBJECT_BY_CODE
-from .prompts import system_prompt, welcome_message
-from .retriever import search_textbooks, search_past_papers, get_collection_stats
-from .patterns import get_pattern, format_pattern_for_prompt, PATTERNS
-from .vision import grade_homework, analyze_diagram
+from agent.config import get_active_tutor, get_active_vision_model, MODELS, SUBJECTS, SUBJECT_BY_CODE
+from agent.tutoring.prompts import system_prompt, welcome_message
+from agent.retrieval.search import search_textbooks, search_past_papers, get_collection_stats
+from agent.tutoring.patterns import get_pattern, format_pattern_for_prompt, PATTERNS
+from agent.ocr.vision import grade_homework, analyze_diagram
 
 console = Console()
 
@@ -282,7 +282,7 @@ class Agent:
 
     def grade(self, question: str, mark_scheme: str, student_answer: str) -> dict:
         """Grade a student answer against a mark scheme. Returns structured JSON."""
-        from .prompts import grading_prompt
+        from agent.tutoring.prompts import grading_prompt
 
         prompt = grading_prompt(question, mark_scheme, student_answer)
         messages = [

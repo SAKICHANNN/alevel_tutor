@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 import requests
 from rich.console import Console
 
-from .config import CHROMA_DIR
+from agent.config import CHROMA_DIR
 
 console = Console()
 
@@ -385,7 +385,7 @@ class VisionAnalyzer:
     """Use Qwen3-VL or GLM-4V for complex diagram/chart/graph understanding."""
 
     def __init__(self):
-        from .config import get_active_vision_model
+        from agent.config import get_active_vision_model
         self.config = get_active_vision_model()
 
     def _call_vision(self, image_data: bytes, prompt: str) -> str:

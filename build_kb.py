@@ -3,7 +3,7 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from agent.kb_builder import build_all
+from agent.retrieval.builder import build_all
 
 if __name__ == "__main__":
     import argparse

@@ -37,7 +37,7 @@ except ImportError:
     pass
 
 
-from .config import CHROMA_DIR, TEXTBOOK_DIR, PAPERS_DIR, GUIDES_DIR
+from agent.config import CHROMA_DIR, TEXTBOOK_DIR, PAPERS_DIR, GUIDES_DIR
 
 
 CHUNK_SIZE = 800

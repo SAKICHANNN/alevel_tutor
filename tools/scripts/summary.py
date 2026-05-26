@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Print a summary of all downloaded resources."""
 import sys, os, json
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from pathlib import Path
 from rich.console import Console

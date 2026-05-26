@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Master summary script showing all collected resources."""
 import sys, os, json
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from pathlib import Path
 from rich.console import Console
@@ -9,7 +9,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.markdown import Markdown
 
-from crawler.resource_index import ALL_RESOURCES, get_essential_resources, count_by_type
+from tools.crawler.resource_index import ALL_RESOURCES, get_essential_resources, count_by_type
 
 console = Console()
 DATA = Path(__file__).parent.parent / "data"
@@ -129,7 +129,7 @@ def main():
   [green]data/study_guides/pdf/[/green]                — PDF guides (6 files, 41MB)
 
 [bold]Quick access to all indexed web resources:[/bold]
-  [cyan]python3 -c "from crawler.resource_index import ALL_RESOURCES; ...[/cyan]
+  [cyan]python3 -c "from tools.crawler.resource_index import ALL_RESOURCES; ...[/cyan]
     """, border_style="green"))
 
     # Print essential resources per subject

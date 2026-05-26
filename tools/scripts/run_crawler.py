@@ -2,10 +2,10 @@
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from crawler.pipeline import run_full_pipeline
-from crawler.config import SUBJECTS
+from tools.crawler.pipeline import run_full_pipeline
+from tools.crawler.config import SUBJECTS
 
 
 def main():

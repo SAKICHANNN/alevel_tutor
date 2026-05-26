@@ -2,9 +2,9 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from .config import SUBJECTS
-from .downloader import clone_repo_sparse, verify_subjects
-from .organizer import organize_papers
+from tools.crawler.config import SUBJECTS
+from tools.crawler.downloader import clone_repo_sparse, verify_subjects
+from tools.crawler.organizer import organize_papers
 
 console = Console()
 

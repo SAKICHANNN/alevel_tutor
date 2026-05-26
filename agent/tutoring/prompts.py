@@ -145,7 +145,7 @@ def grading_prompt(question: str, mark_scheme: str, student_answer: str) -> str:
 def welcome_message(subjects: list = None) -> str:
     """Generate welcome message from the current subject registry."""
     if subjects is None:
-        from .config import SUBJECTS as _s
+        from agent.config import SUBJECTS as _s
         subjects = _s
     codes = " · ".join(f"{s.code} {s.name}" for s in subjects)
     return f"""🎓 **AI 导师** 已就绪！

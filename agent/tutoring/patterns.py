@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from .config import PATTERNS_DIR, SUBJECT_BY_CODE
+from agent.config import PATTERNS_DIR, SUBJECT_BY_CODE
 
 PATTERNS: dict = {}
 

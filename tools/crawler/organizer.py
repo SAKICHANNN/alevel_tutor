@@ -7,7 +7,7 @@ from typing import List
 
 from rich.console import Console
 
-from .config import (
+from tools.crawler.config import (
     SUBJECTS,
     REPO_DIR,
     PAPERS_DIR,

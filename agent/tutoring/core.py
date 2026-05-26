@@ -4,6 +4,7 @@ Uses parameterized subject system — add new boards/subjects via JSON config.
 """
 import json
 import re
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -113,8 +114,9 @@ class Agent:
             {"role": "system", "content": system_prompt(self._subjects_summary)},
         ]
         self.current_subject = None
+        self._pending_image = None  # Temp image path for grade_homework_image tool
 
-    def _call_llm(self, messages: list, model_key: str = "tutor") -> str:
+    def _call_llm(self, messages: list, model_key: str = "tutor", max_retries: int = 2) -> dict:
         config = MODELS[model_key]
         if not config.api_key:
             raise ValueError(f"No API key configured for {model_key}. Set environment variables.")
@@ -132,15 +134,37 @@ class Agent:
             "tools": TOOLS,
             "tool_choice": "auto",
         }
+        # Enable DeepSeek thinking mode for reasoner
+        if config.thinking:
+            payload["thinking"] = {"type": "enabled"}
 
-        resp = requests.post(
-            f"{config.base_url}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=120,
-        )
-        resp.raise_for_status()
-        return resp.json()
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                resp = requests.post(
+                    f"{config.base_url}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=120,
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except requests.exceptions.HTTPError as e:
+                status = e.response.status_code if e.response is not None else 0
+                if status == 429 and attempt < max_retries:
+                    time.sleep(2 ** attempt)
+                    continue
+                if status >= 500 and attempt < max_retries:
+                    time.sleep(1)
+                    continue
+                last_error = e
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries:
+                    time.sleep(1)
+                    continue
+                last_error = e
+
+        raise last_error or RuntimeError(f"LLM call failed after {max_retries+1} attempts")
 
     def _execute_tool(self, tool_name: str, arguments: dict) -> str:
         """Execute a tool call and return the result as a string."""
@@ -182,7 +206,20 @@ class Agent:
                 return f"该科目暂无此 topic 的套路模板。可用通用考试技巧：先识别题型→回忆相关公式/概念→分步骤解答→检查单位和有效数字。"
 
         elif tool_name == "grade_homework_image":
-            return "图片批改功能需要学生直接上传图片。请提示学生使用 `/grade <图片路径>` 命令。也可直接在聊天中附上图片。"
+            image_desc = arguments.get("image_description", "")
+            subject_code = arguments.get("subject_context", self.current_subject or "")
+            # If we have vision access, try real grading
+            try:
+                img_path = self._pending_image
+                if img_path:
+                    result = grade_homework(img_path, subject_code)
+                    return result
+            except Exception:
+                pass
+            # Text-only fallback: grade based on the description the LLM provides
+            if image_desc:
+                return f"基于图片描述 ({subject_code})，请用 grading 功能评分。\n描述: {image_desc}"
+            return "请上传图片。在 CLI 中使用 `/grade <路径>`，或直接在聊天中附上图片。"
 
         elif tool_name == "search_exam_techniques":
             results = _search_techniques(
@@ -207,23 +244,27 @@ class Agent:
             return f"Unknown tool: {tool_name}"
 
     def _detect_subject(self, text: str) -> Optional[str]:
-        """Detect subject from text keywords — uses current subject registry."""
+        """Detect subject from text using subject registry + keyword overlap."""
         text_lower = text.lower()
         scores = {}
+        # Known aliases for our 4 subjects — optimization, not requirement
+        _aliases = {
+            "9701": ["chemistry", "chem", "化学", "equilibrium", "enthalpy", "organic", "mole", "bond", "periodic"],
+            "9702": ["physics", "phys", "物理", "velocity", "circuit", "wave", "momentum", "kinetic", "magnetic"],
+            "9708": ["economics", "econ", "经济", "demand", "supply", "inflation", "market", "elasticity", "gdp"],
+            "9709": ["math", "maths", "mathematics", "数学", "integrat", "differenti", "calculus", "algebra", "trig", "vector"],
+        }
         for s in self.subjects:
             score = 0
-            # code match
             if s.code in text:
                 score += 5
-            # name match (English + Chinese)
-            name_map = {
-                "9701": ["chemistry", "chem", "化学", "mole", "equilibrium", "organic", "enthalpy", "titration", "periodic", "bond"],
-                "9702": ["physics", "phys", "物理", "velocity", "force", "circuit", "wave", "momentum"],
-                "9708": ["economics", "econ", "经济", "demand", "supply", "inflation", "market", "elasticity"],
-                "9709": ["mathematics", "math", "maths", "数学", "integr", "differenti", "calculus", "algebra", "trig", "vector"],
-            }
-            keywords = name_map.get(s.code, [s.name.lower()])
-            score += sum(1 for kw in keywords if kw in text_lower)
+            # Always check subject name (works for any future board/subject)
+            if s.name.lower() in text_lower:
+                score += 3
+            # Add known aliases if available
+            for kw in _aliases.get(s.code, []):
+                if kw in text_lower:
+                    score += 1
             if score > 0:
                 scores[s.code] = score
         return max(scores, key=scores.get) if scores else None

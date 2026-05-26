@@ -8,7 +8,7 @@ import sys
 import cmd
 import re
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from rich.console import Console
 from rich.markdown import Markdown

@@ -53,13 +53,14 @@ class LLMConfig:
     base_url: str
     temperature: float = 0.7
     max_tokens: int = 4096
+    thinking: bool = False  # Enable DeepSeek thinking/reasoning mode
 
 
 # Model Registry — latest model IDs as of 2026-05
 MODELS = {
     "tutor": LLMConfig(
         provider="deepseek",
-        model="deepseek-chat",
+        model="deepseek-v4-flash",
         api_key=DEEPSEEK_API_KEY,
         base_url=DEEPSEEK_BASE_URL,
         temperature=0.7,
@@ -67,15 +68,16 @@ MODELS = {
     ),
     "reasoner": LLMConfig(
         provider="deepseek",
-        model="deepseek-chat",
+        model="deepseek-v4-flash",
         api_key=DEEPSEEK_API_KEY,
         base_url=DEEPSEEK_BASE_URL,
         temperature=0.3,
         max_tokens=8192,
+        thinking=True,  # Enables step-by-step reasoning chain
     ),
     "fast": LLMConfig(
         provider="deepseek",
-        model="deepseek-chat",
+        model="deepseek-v4-flash",
         api_key=DEEPSEEK_API_KEY,
         base_url=DEEPSEEK_BASE_URL,
         temperature=0.1,

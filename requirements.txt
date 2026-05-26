@@ -1,0 +1,6 @@
+requests>=2.28.0
+rich>=13.0.0
+gitpython>=3.1.30
+chromadb>=0.4.0
+PyMuPDF>=1.23.0
+sentence-transformers>=2.2.0

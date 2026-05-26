@@ -1,0 +1,32 @@
+# Data directories (large files)
+data/past_papers/
+data/repo/
+data/chroma_db/
+data/ocr_cache/
+data/content_samples/
+data/textbooks/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log

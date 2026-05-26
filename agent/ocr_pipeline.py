@@ -287,15 +287,12 @@ class FormulaOCREngine:
             from PIL import Image
             img = Image.open(io.BytesIO(image_data))
             arr = np.array(img)
-            result = self._formula_ocr(arr)
-            if result:
-                tex = str(result) if isinstance(result, str) else result.get("formula", str(result))
-                conf = 0.8
-                if isinstance(result, dict):
-                    conf = result.get("confidence", 0.8)
-                    tex = result.get("formula", str(result))
-                if tex and len(tex) > 1:
-                    return [{"latex": tex, "confidence": conf}]
+            result = self._formula_ocr.predict(arr)
+            if isinstance(result, list) and len(result) > 0:
+                r = result[0]
+                tex = r.get("rec_formula", "") if isinstance(r, dict) else str(r)
+                if tex and len(tex) > 5:
+                    return [{"latex": tex, "confidence": 0.85}]
         except Exception as e:
             console.print(f"[dim]PP-FormulaNet OCR failed: {e}[/dim]")
         return []

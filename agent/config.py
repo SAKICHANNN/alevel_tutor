@@ -138,11 +138,24 @@ def get_active_tutor() -> LLMConfig:
 
 @dataclass
 class Subject:
-    """A subject within an exam board. Future-proof: add IB, Edexcel, AQA, etc."""
+    """A subject within an exam board. Fields marked Optional are for future boards."""
     board: str           # "caie-alevel", "caie-igcse", "ib-dp", "edexcel-ial", "aqa-alevel"
     code: str            # "9701", "0620", "chem-hl", "WCH11"
     name: str            # "Chemistry", "Physics"
-    level: str = "A-Level"  # "AS", "A-Level", "IGCSE", "HL", "SL"
+    level: str = "A-Level"
+    
+    # ── Exam-board adapter metadata ──
+    syllabus_years: str = ""           # "2025-2027"
+    components: dict = None            # {"P1": "Multiple Choice", "P2": "Structured", ...}
+    assessment_objectives: dict = None # {"AO1": "Knowledge", "AO2": "Application", ...}
+    command_words: list = None         # ["Define", "Describe", "Explain", ...]
+    calculator_policy: str = ""        # "Scientific calculator allowed, no CAS"
+    notation_rules: str = ""           # "3 s.f. unless exact requested"
+
+    def __post_init__(self):
+        if self.components is None: self.components = {}
+        if self.assessment_objectives is None: self.assessment_objectives = {}
+        if self.command_words is None: self.command_words = []
 
     @property
     def display_name(self) -> str:
@@ -176,24 +189,101 @@ class Subject:
             "code": self.code,
             "name": self.name,
             "level": self.level,
+            "syllabus_years": self.syllabus_years,
+            "components": ", ".join(f"{k}: {v}" for k, v in self.components.items()) if self.components else "",
+            "assessment_objectives": ", ".join(f"{k}: {v}" for k, v in self.assessment_objectives.items()) if self.assessment_objectives else "",
+            "command_words": ", ".join(self.command_words) if self.command_words else "",
+            "calculator_policy": self.calculator_policy,
+            "notation_rules": self.notation_rules,
         }
 
 
 # Current active subjects (the 4 we support in MVP)
 SUBJECTS: List[Subject] = [
-    Subject(board="caie-alevel", code="9701", name="Chemistry"),
-    Subject(board="caie-alevel", code="9702", name="Physics"),
-    Subject(board="caie-alevel", code="9708", name="Economics"),
-    Subject(board="caie-alevel", code="9709", name="Mathematics"),
+    Subject(
+        board="caie-alevel", code="9701", name="Chemistry",
+        syllabus_years="2025-2027",
+        components={
+            "P1": "Multiple Choice (40q, 60min)",
+            "P2": "AS Structured Questions (60 marks)",
+            "P3": "Advanced Practical Skills (40 marks, 2h)",
+            "P4": "A Level Structured Questions (100 marks)",
+            "P5": "Planning, Analysis and Evaluation (30 marks)",
+        },
+        assessment_objectives={
+            "AO1": "Knowledge and understanding",
+            "AO2": "Handling, applying and evaluating information",
+            "AO3": "Experimental skills and investigations",
+        },
+        command_words=["State", "Define", "Describe", "Explain", "Suggest", "Calculate", "Predict", "Compare", "Evaluate", "Deduce", "Draw"],
+        calculator_policy="Scientific calculator allowed. No programmable/graphical calculators.",
+        notation_rules="3 s.f. unless specified otherwise. Keep intermediate values in calculator.",
+    ),
+    Subject(
+        board="caie-alevel", code="9702", name="Physics",
+        syllabus_years="2025-2027",
+        components={
+            "P1": "Multiple Choice (40q, 75min)",
+            "P2": "AS Structured Questions (60 marks)",
+            "P3": "Advanced Practical Skills (40 marks, 2h)",
+            "P4": "A Level Structured Questions (100 marks)",
+            "P5": "Planning, Analysis and Evaluation (30 marks)",
+        },
+        assessment_objectives={
+            "AO1": "Knowledge and understanding",
+            "AO2": "Handling, applying and evaluating information",
+            "AO3": "Experimental skills and investigations",
+        },
+        command_words=["State", "Define", "Describe", "Explain", "Calculate", "Show that", "Determine", "Sketch", "Plot", "Compare", "Evaluate", "Deduce"],
+        calculator_policy="Scientific calculator allowed. No programmable/graphical calculators.",
+        notation_rules="Show formula → substitution → answer with unit. Vector direction must be indicated.",
+    ),
+    Subject(
+        board="caie-alevel", code="9708", name="Economics",
+        syllabus_years="2026-2028",
+        components={
+            "P1": "Multiple Choice (30q, 60min)",
+            "P2": "Data Response and Essay (40 marks, 2h)",
+            "P3": "Case Study and Essay (40 marks, 2h)",
+            "P4": "Data Response and Essays (60 marks, 2h)",
+        },
+        assessment_objectives={
+            "AO1": "Knowledge and understanding (33%)",
+            "AO2": "Analysis (37%)",
+            "AO3": "Evaluation (30%)",
+        },
+        command_words=["State", "Identify", "Define", "Describe", "Explain", "Analyse", "Assess", "Evaluate", "Discuss", "Compare", "Calculate"],
+        calculator_policy="Scientific calculator allowed.",
+        notation_rules="Diagrams must be labelled. Quotes from extract required in data response.",
+    ),
+    Subject(
+        board="caie-alevel", code="9709", name="Mathematics",
+        syllabus_years="2026-2027",
+        components={
+            "P1": "Pure Mathematics 1 (75 marks, 1h50m)",
+            "P2": "Pure Mathematics 2 (50 marks, 1h15m)",
+            "P3": "Pure Mathematics 3 (75 marks, 1h50m)",
+            "P4": "Mechanics (50 marks, 1h15m)",
+            "P5": "Probability & Statistics 1 (50 marks, 1h15m)",
+            "P6": "Probability & Statistics 2 (50 marks, 1h15m)",
+        },
+        assessment_objectives={
+            "AO1": "Knowledge and understanding",
+            "AO2": "Application and communication",
+        },
+        command_words=["Calculate", "Show that", "Find", "Solve", "Simplify", "Prove", "Sketch", "Draw", "Determine", "Verify"],
+        calculator_policy="Scientific calculator allowed. NO equation solvers, NO programmable, NO graphical calculators.",
+        notation_rules="Show ALL working. No marks for unsupported calculator answers. Exact values unless decimal requested. 3 s.f. standard.",
+    ),
 ]
 
 # Quick lookup
 SUBJECT_BY_CODE: dict[str, Subject] = {s.code: s for s in SUBJECTS}
 
 
-def register_subject(board: str, code: str, name: str, level: str = "A-Level") -> Subject:
-    """Add a new subject at runtime (e.g. for future expansion)."""
-    s = Subject(board=board, code=code, name=name, level=level)
+def register_subject(board: str, code: str, name: str, level: str = "A-Level", **kwargs) -> Subject:
+    """Add a new subject at runtime. Extra kwargs passed to Subject constructor."""
+    s = Subject(board=board, code=code, name=name, level=level, **kwargs)
     if code not in SUBJECT_BY_CODE:
         SUBJECTS.append(s)
         SUBJECT_BY_CODE[code] = s

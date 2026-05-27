@@ -685,20 +685,35 @@ class OCRPipeline:
         image_data: bytes,
         subject_code: str,
     ) -> dict:
-        """Process a question image. Returns PaddleOCR text + Qwen VLM full-page parse."""
+        """Process a question image. Returns text + VLM parsed content + confidence tier + user message."""
         result = self.process_page(image_data, subject_code)
         vlm_description = ""
         if result.diagram_regions:
             vlm_description = result.diagram_regions[0].description
 
+        confidence = result.overall_confidence
+        tier, user_message = self._degradation_tier(confidence)
+
         return {
-            "status": "success" if result.overall_confidence > 0.4 else "low_confidence",
+            "status": "success" if confidence > 0.4 else "low_confidence",
+            "confidence_tier": tier,
+            "user_message": user_message,
             "subject": subject_code,
             "paddle_text": result.full_text,
             "vlm_parse": vlm_description,
-            "overall_confidence": result.overall_confidence,
+            "overall_confidence": confidence,
             "processing_time_ms": result.processing_time_ms,
         }
+
+    @staticmethod
+    def _degradation_tier(confidence: float) -> tuple:
+        """Return (tier_label, user_facing_message) based on OCR confidence."""
+        if confidence >= 0.7:
+            return ("clear", "")
+        elif confidence >= 0.4:
+            return ("unclear", "⚠️ 图片质量一般，OCR 可能不完整。请确认识别结果是否正确，如有错误可手动修正后继续。")
+        else:
+            return ("unreadable", "❌ 图片不清晰，无法准确识别。请重新拍照（光线充足、平铺拍摄）或手动输入题目内容。")
 
 
 # ── Singleton ──

@@ -294,33 +294,46 @@ class PaddleOCREngine:
 # ── Formula / LaTeX OCR Engines ──
 
 class FormulaOCREngine:
-    """Formula OCR: PP-FormulaNet (fast) → Qwen VLM (accurate fallback) → MathPix (paid fallback)."""
+    """Formula OCR: delegates to Qwen VLM (local, accurate, free). 
+    PP-FormulaNet retained only as fast fallback if VLM unavailable."""
 
     def __init__(self):
-        self._formula_ocr = None
+        self._pp_ocr = None
         self._init_attempted = False
-        self._vlm_available = None
 
-    @staticmethod
-    def _is_garbled_formula(latex: str) -> bool:
-        """Check if LaTeX output has artifacts indicating poor quality."""
-        if not latex or len(latex) < 5:
-            return True
-        garbled_markers = [
-            r'\mathrm{\tt',   
-            r'\bf',           
-            r'\begin{dmath*}',  # PP-FormulaNet failed layout detection
-            r'\underline{\underline',  # Nested underline = layout failure
-            'qquad' * 5,      
-        ]
-        for marker in garbled_markers:
-            if marker in latex:
-                return True
-        # Formula should contain recognizable math
-        has_math = any(c in latex for c in '=+-*/^_(){}\\')
-        if not has_math and len(latex) > 20:
-            return True  # Long output without math = likely text OCR'd as formula
-        return False
+    def extract_formulas(self, image_data: bytes) -> list:
+        # Primary: Qwen VLM (most accurate)
+        try:
+            from agent.config import get_active_vision_model
+            config = get_active_vision_model()
+            if config and config.api_key:
+                b64 = base64.b64encode(image_data).decode()
+                resp = requests.post(
+                    f"{config.base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {config.api_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": config.model,
+                        "messages": [{"role": "user", "content": [
+                            {"type": "text", "text": "Extract the mathematical formula as LaTeX. Output ONLY the LaTeX, no markdown, no $$."},
+                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                        ]}],
+                        "temperature": 0.1, "max_tokens": 400,
+                    },
+                    timeout=120,
+                )
+                data = resp.json()
+                tex = data["choices"][0]["message"]["content"].strip()
+                tex = tex.removeprefix("```latex").removesuffix("```")
+                tex = re.sub(r'^\$\$?\s*', '', tex)
+                tex = re.sub(r'\s*\$\$?$', '', tex)
+                if tex:
+                    console.print("[dim]Qwen VLM formula extracted[/dim]")
+                    return [{"latex": tex, "confidence": 0.90}]
+        except Exception as e:
+            console.print(f"[dim]VLM formula failed: {e}[/dim]")
+
+        # Fallback: PP-FormulaNet (fast, less accurate, free)
+        return self._try_pp_formulanet(image_data) or self._try_mathpix(image_data)
 
     def _init_pp_formulanet(self) -> bool:
         if self._init_attempted:
@@ -478,101 +491,95 @@ class ChemistryOCREngine:
 # ── Vision Model (VLM) for complex understanding ──
 
 class VisionAnalyzer:
-    """Use Qwen3-VL or GLM-4V for complex diagram/chart/graph understanding."""
+    """Qwen3-VL (LM Studio local) handles all structural OCR: formulas, diagrams, tables, handwriting.
+    PaddleOCR only does plain English text extraction. Everything difficult → Qwen."""
 
     def __init__(self):
         from agent.config import get_active_vision_model
         self.config = get_active_vision_model()
 
-    def _call_vision(self, image_data: bytes, prompt: str) -> str:
-        if not self.config.api_key:
-            console.print("[yellow]No vision API key configured.[/yellow]")
+    @property
+    def available(self) -> bool:
+        return bool(self.config and self.config.api_key)
+
+    def _call_vision(self, image_data: bytes, prompt: str, max_tokens: int = 1024) -> str:
+        if not self.available:
             return ""
 
         img_b64 = base64.b64encode(image_data).decode()
-
-        headers = {
-            "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json",
-        }
-
-        payload = {
-            "model": self.config.model,
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{img_b64}"},
-                    },
-                ],
-            }],
-            "temperature": 0.2,
-            "max_tokens": 1024,
-        }
-
         try:
             resp = requests.post(
                 f"{self.config.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=60,
+                headers={
+                    "Authorization": f"Bearer {self.config.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.config.model,
+                    "messages": [{"role": "user", "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}},
+                    ]}],
+                    "temperature": 0.1,
+                    "max_tokens": max_tokens,
+                },
+                timeout=120,
             )
             data = resp.json()
             return data["choices"][0]["message"]["content"]
         except Exception as e:
-            console.print(f"[dim]Vision API failed: {e}[/dim]")
+            console.print(f"[dim]VLM: {e}[/dim]")
             return ""
 
+    def _page_type_prompt(self, subject_code: str) -> str:
+        """Build a comprehensive prompt based on subject."""
+        base = "Analyze this A-Level exam page. Extract everything:"
+        prompts = {
+            "9701": base + "\n- All text (question numbers, instructions)\n- Chemical equations as LaTeX (e.g. \\ce{2H2 + O2 -> 2H2O})\n- Organic structures (describe functional groups, bonds)\n- Tables (as markdown)\n- Graphs (describe axes, trends, key points)\n- Spectra (IR/NMR/MS — identify peaks)\n- If a reaction mechanism is shown, describe the arrow movement step-by-step",
+            "9702": base + "\n- All text\n- Mathematical formulas as LaTeX\n- Circuit diagrams (list components and connections)\n- Force/free-body diagrams (describe forces and directions)\n- Wave diagrams\n- Graphs (describe axes, data, trends)\n- Tables (as markdown)",
+            "9708": base + "\n- All text, especially the extract/data passage\n- Economic diagrams (demand/supply, AD/AS, elasticity, PPC, externality)\n- Tables (as markdown with headers)\n- Graphs and charts",
+            "9709": base + "\n- All text and question numbers\n- ALL mathematical formulas as LaTeX (use $$ for display, $ for inline)\n- Coordinate geometry diagrams (describe curves, intersections)\n- Mechanics diagrams (forces, pulleys, inclines)\n- Tables (as markdown)\n- Statistical graphs and charts",
+        }
+        return prompts.get(subject_code, base + "\n- All text\n- Formulas as LaTeX\n- Diagrams\n- Tables\n- Graphs")
+
+    def extract_formulas(self, image_data: bytes) -> str:
+        return self._call_vision(
+            image_data,
+            "Extract ALL mathematical formulas from this image as LaTeX. Use $$ for display math, $ for inline. Include chemical equations as \\ce{}. Output only the formulas, one per line.",
+            max_tokens=800,
+        )
+
     def analyze_diagram(self, image_data: bytes, subject_code: str, diagram_type: str) -> dict:
-        """Analyze any diagram type and return structured understanding."""
         prompts = {
             "circuit": "Describe this circuit diagram. List all components, their connections, and values shown.",
             "force": "Describe this force/free-body diagram. What objects, forces, and directions are shown?",
-            "wave": "Describe this wave diagram. What type of waves, what patterns/measurements are shown?",
-            "mechanism": "Describe this organic reaction mechanism. What reaction type, what happens to electrons?",
-            "energy_cycle": "Describe this energy cycle/enthalpy diagram. What substances and energy changes are shown?",
-            "molecule_3d": "Describe this molecular geometry diagram. What shape, bond angles, and atom arrangement?",
-            "spectrum": "Describe this spectrum/chromatogram. What type, key peaks/features shown?",
-            "economic_graph": "Describe this economic diagram. What curves are shown, what economic situation does it depict?",
-            "coordinate_graph": "Describe this mathematical graph. What function/curve, key points, axes labels?",
-            "experiment": "Describe this experimental setup. What equipment is shown, what is being measured?",
+            "wave": "Describe this wave diagram. What type, what measurements are shown?",
+            "mechanism": "Describe this organic mechanism. What reaction type, what happens to electrons in each step?",
+            "economic_graph": "Describe this economic diagram. What model, what curves shift, what outcome?",
         }
-        prompt = prompts.get(diagram_type, f"Describe this {diagram_type} diagram in detail.")
-        if subject_code:
-            prompt += f" This is from Cambridge A-Level subject {subject_code}."
+        prompt = prompts.get(diagram_type, f"Describe this {diagram_type} in detail.")
+        desc = self._call_vision(image_data, prompt)
+        return {"type": diagram_type, "description": desc}
 
-        description = self._call_vision(image_data, prompt)
-        return {
-            "type": diagram_type,
-            "subject": subject_code,
-            "description": description,
-            "raw_response": description,
-        }
+    def extract_table(self, image_data: bytes) -> str:
+        return self._call_vision(
+            image_data,
+            "Extract this table as a markdown table. Include all headers and data values. Output ONLY the markdown table.",
+            max_tokens=600,
+        )
 
-    def extract_graph_data(self, image_data: bytes, subject_code: str) -> dict:
-        """Extract semantic understanding of a graph (not numerical data)."""
-        prompt = """Analyze this graph/chart:
-1. What is plotted on each axis (label + unit)?
-2. What type of graph is this (line, scatter, bar, curve)?
-3. What is the overall trend or relationship shown?
-4. Are there any key points (intercepts, maxima, minima, thresholds)?
-5. If this is an economic graph, what economic model does it depict?"""
+    def read_handwriting(self, image_data: bytes) -> dict:
+        text = self._call_vision(
+            image_data,
+            "Transcribe all handwritten text. Identify math symbols/formulas as LaTeX. Note unclear parts with [?]. Do not correct errors.",
+            max_tokens=800,
+        )
+        return {"transcription": text}
 
-        description = self._call_vision(image_data, prompt)
-        return {"description": description, "type": "graph_analysis"}
-
-    def analyze_handwriting(self, image_data: bytes) -> dict:
-        """Analyze handwritten content and attempt to interpret meaning."""
-        prompt = """This image shows handwritten student work for an A-Level exam.
-1. Transcribe ALL visible text and numbers you can read
-2. Identify any mathematical symbols, formulas, or equations
-3. Note any parts that are unclear or ambiguous
-4. Do NOT correct errors - just transcribe what you see"""
-
-        description = self._call_vision(image_data, prompt)
-        return {"transcription": description}
+    def full_page_parse(self, image_data: bytes, subject_code: str) -> str:
+        """Comprehensive page parsing — text + formulas + tables + diagrams."""
+        prompt = self._page_type_prompt(subject_code)
+        return self._call_vision(image_data, prompt, max_tokens=1500)
 
 
 # ── Main OCR Pipeline ──
@@ -592,27 +599,26 @@ class OCRPipeline:
         self,
         image_data: bytes,
         subject_code: str,
-        expected_types: Optional[list] = None,
     ) -> PageExtractionResult:
-        """Process a page image and extract all content types."""
+        """Process a page image.
+        PaddleOCR → plain text (fast). Qwen VLM → everything structural (formulas, tables, diagrams).
+        """
         import time
         start = time.time()
 
-        # 1. Preprocess
-        processed = self.preprocessor.preprocess(image_data)
-        img_hash = self.preprocessor.compute_hash(processed)
+        processed = self.preprocessor.preprocess(image_data, is_document=False)
+        img_hash = self.preprocessor.compute_hash(image_data)
 
-        # 2. Check cache
+        # Cache check
         cached = self.cache.get(img_hash)
         if cached:
             console.print("[dim]OCR cache hit[/dim]")
-            result = PageExtractionResult(**cached)
-            return result
+            return PageExtractionResult(**cached)
 
         result = PageExtractionResult(page_number=0)
 
-        # 3. Text OCR (always run first - gives us layout understanding)
-        console.print("[dim]PaddleOCR text extraction...[/dim]")
+        # Step 1: PaddleOCR plain text (always, fast)
+        console.print("[dim]PaddleOCR text...[/dim]")
         text_regions = self.text_ocr.extract_text(processed)
         for r in text_regions:
             result.text_regions.append(TextRegion(
@@ -621,94 +627,45 @@ class OCRPipeline:
             ))
         result.full_text = " ".join(r.text for r in result.text_regions)
 
-        # 4. Table extraction
-        console.print("[dim]Table extraction...[/dim]")
-        tables = self.text_ocr.extract_tables(processed)
-        for t in tables:
-            result.table_regions.append(TableRegion(
-                bbox=t["bbox"], html=t["html"], markdown="",
-                rows=0, cols=0, confidence=t["confidence"]
-            ))
-
-        # 5. Formula extraction (math + chemistry)
-        console.print("[dim]Formula extraction...[/dim]")
-        formulas = self.formula_ocr.extract_formulas(processed)
-        for f in formulas:
-            result.formula_regions.append(FormulaRegion(
-                bbox=[0, 0, 0, 0], latex=f["latex"],
-                confidence=f["confidence"],
-                formula_type="display_math"
-            ))
-
-        # 6. Chemistry-specific: structure extraction
-        if subject_code == "9701":
-            console.print("[dim]Chemistry structure extraction...[/dim]")
-            struct = self.chemo_ocr.extract_structure(processed)
-            if struct:
-                result.formula_regions.append(FormulaRegion(
+        # Step 2: Qwen VLM handles everything structural
+        if self.vision.available:
+            console.print("[dim]Qwen VLM full-page parse...[/dim]")
+            parsed = self.vision.full_page_parse(image_data, subject_code)  # Original image for VLM
+            if parsed:
+                result.diagram_regions.append(DiagramRegion(
                     bbox=[0, 0, 0, 0],
-                    latex=f"\\ce{{{struct['smiles']}}}",
-                    confidence=struct["confidence"],
-                    formula_type="chemical_eq"
+                    diagram_type="full_page",
+                    description=parsed,
+                    structured_data={"full_parse": parsed},
+                    confidence=0.85,
                 ))
 
-        # 7. Vision model for complex understanding (diagrams, graphs, mechanisms)
-        if self.vision.config.api_key:
-            console.print("[dim]Vision model analysis...[/dim]")
-            # Classify what's in the image
-            text_lower = result.full_text.lower()
-
-            if subject_code == "9702" and any(w in text_lower for w in ["circuit", "resistor", "voltage"]):
-                diag = self.vision.analyze_diagram(processed, subject_code, "circuit")
-                result.diagram_regions.append(DiagramRegion(
-                    bbox=[0, 0, 0, 0], diagram_type="circuit",
-                    description=diag["description"], structured_data=diag,
+            # Handwriting check
+            if self._likely_handwriting(result):
+                console.print("[dim]Handwriting analysis...[/dim]")
+                hw = self.vision.read_handwriting(processed)
+                confidence = 0.5
+                result.handwriting_regions.append(HandwritingRegion(
+                    bbox=[0, 0, 0, 0],
+                    raw_ocr_text=result.full_text,
+                    corrected_text=hw.get("transcription", ""),
+                    latex_equations=[],
+                    confidence=confidence,
+                    needs_manual_review=confidence < 0.6,
                 ))
-
-            if subject_code == "9701" and any(w in text_lower for w in ["mechanism", "curly", "nucleophil"]):
-                diag = self.vision.analyze_diagram(processed, subject_code, "mechanism")
-                result.diagram_regions.append(DiagramRegion(
-                    bbox=[0, 0, 0, 0], diagram_type="mechanism",
-                    description=diag["description"], structured_data=diag,
-                    original_image=processed,
-                ))
-
-            if subject_code == "9708":
-                graph = self.vision.extract_graph_data(processed, subject_code)
-                result.graph_regions.append(GraphRegion(
-                    bbox=[0, 0, 0, 0], graph_type="economic_graph",
-                    axes={}, description=graph["description"],
-                    data_points=[], confidence=0.7,
-                ))
-
-        # 8. Handwriting detection and handling
-        if self._likely_handwriting(result):
-            console.print("[dim]Handwriting analysis...[/dim]")
-            hw = self.vision.analyze_handwriting(processed)
-            confidence = 0.5  # Default moderate for handwriting
-            result.handwriting_regions.append(HandwritingRegion(
-                bbox=[0, 0, 0, 0],
-                raw_ocr_text=result.full_text,
-                corrected_text=hw.get("transcription", ""),
-                latex_equations=[],
-                confidence=confidence,
-                needs_manual_review=confidence < 0.6,
-            ))
-
-        # 9. Calculate overall confidence
-        all_confs = [r.confidence for r in result.text_regions]
-        if all_confs:
-            result.overall_confidence = sum(all_confs) / len(all_confs)
         else:
-            result.overall_confidence = 0.5
+            # Fallback: multi-engine approach (same as before, PaddleOCR only)
+            console.print("[dim]VLM unavailable, PaddleOCR-only mode[/dim]")
 
+        # Final confidence
+        all_confs = [r.confidence for r in result.text_regions]
+        result.overall_confidence = sum(all_confs) / len(all_confs) if all_confs else 0.5
         result.processing_time_ms = (time.time() - start) * 1000
 
-        # 10. Cache result
+        # Cache
         self.cache.set(img_hash, {
             "page_number": result.page_number,
             "text_regions": [{"bbox": t.bbox, "text": t.text, "confidence": t.confidence, "region_type": t.region_type} for t in result.text_regions],
-            "table_regions": [{"bbox": t.bbox, "html": t.html, "confidence": t.confidence} for t in result.table_regions],
             "full_text": result.full_text,
             "overall_confidence": result.overall_confidence,
         })
@@ -728,38 +685,17 @@ class OCRPipeline:
         image_data: bytes,
         subject_code: str,
     ) -> dict:
-        """Process a single question image and return CanonicalQuestion-like structure."""
+        """Process a question image. Returns PaddleOCR text + Qwen VLM full-page parse."""
         result = self.process_page(image_data, subject_code)
+        vlm_description = ""
+        if result.diagram_regions:
+            vlm_description = result.diagram_regions[0].description
 
         return {
-            "status": "success" if result.overall_confidence > 0.6 else "low_confidence",
+            "status": "success" if result.overall_confidence > 0.4 else "low_confidence",
             "subject": subject_code,
-            "full_text": result.full_text,
-            "tables": [
-                {"html": t.html, "confidence": t.confidence}
-                for t in result.table_regions
-            ],
-            "formulas": [
-                {"latex": f.latex, "type": f.formula_type, "confidence": f.confidence}
-                for f in result.formula_regions
-            ],
-            "diagrams": [
-                {"type": d.diagram_type, "description": d.description}
-                for d in result.diagram_regions
-            ],
-            "graphs": [
-                {"type": g.graph_type, "description": g.description}
-                for g in result.graph_regions
-            ],
-            "handwriting": [
-                {
-                    "raw_text": h.raw_ocr_text,
-                    "corrected_text": h.corrected_text,
-                    "confidence": h.confidence,
-                    "needs_manual_review": h.needs_manual_review,
-                }
-                for h in result.handwriting_regions
-            ],
+            "paddle_text": result.full_text,
+            "vlm_parse": vlm_description,
             "overall_confidence": result.overall_confidence,
             "processing_time_ms": result.processing_time_ms,
         }

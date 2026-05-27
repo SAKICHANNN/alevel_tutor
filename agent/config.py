@@ -44,6 +44,9 @@ ZHIPU_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
 QWEN_API_KEY = os.getenv("DASHSCOPE_API_KEY", os.getenv("QWEN_API_KEY", ""))
 QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
+LMSTUDIO_BASE_URL = os.getenv("LMSTUDIO_BASE_URL", "http://127.0.0.1:1234/v1")
+LMSTUDIO_VLM_MODEL = os.getenv("LMSTUDIO_VLM_MODEL", "qwen/qwen3-vl-8b")
+
 
 @dataclass
 class LLMConfig:
@@ -99,11 +102,20 @@ MODELS = {
         temperature=0.3,
         max_tokens=2048,
     ),
+    "vision_local": LLMConfig(
+        provider="lmstudio",
+        model=LMSTUDIO_VLM_MODEL,
+        api_key="lm-studio",
+        base_url=LMSTUDIO_BASE_URL,
+        temperature=0.2,
+        max_tokens=2048,
+    ),
 }
 
 
 def get_active_vision_model() -> LLMConfig:
-    for key in ["vision", "vision_qwen"]:
+    """Return the first available vision model. Prefers local LM Studio."""
+    for key in ["vision_local", "vision", "vision_qwen"]:
         config = MODELS[key]
         if config.api_key:
             return config

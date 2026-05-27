@@ -1,0 +1,26 @@
+[
+  {
+    "image": "data/eval/formula_test/p1_pg3.png",
+    "crop": [
+      650,
+      70,
+      1450,
+      260
+    ],
+    "expected_latex": "2x^{-\\frac{1}{3}} - x^{\\frac{1}{3}}",
+    "description": "𝑓′(𝑥) expression",
+    "subject": "9709"
+  },
+  {
+    "image": "data/eval/formula_test/p1_pg5.png",
+    "crop": [
+      300,
+      200,
+      900,
+      500
+    ],
+    "expected_latex": "integral or differentiation",
+    "description": "Math working",
+    "subject": "9709"
+  }
+]

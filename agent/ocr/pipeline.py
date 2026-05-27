@@ -206,24 +206,62 @@ class PaddleOCREngine:
         return self._ocr
 
     def extract_text(self, image_data: bytes) -> list:
+        """Extract text regions using PaddleOCR 3.x predict API."""
         if self.ocr is None:
             return [{"bbox": [0, 0, 0, 0], "text": "[PaddleOCR not available]", "confidence": 0}]
         import numpy as np
         from PIL import Image
         img = Image.open(io.BytesIO(image_data))
         arr = np.array(img)
-        results = self.ocr.ocr(arr)
-        if not results or not results[0]:
+        results = self.ocr.predict(arr)
+        if not results:
             return []
-        return [
-            {
-                "bbox": [int(line[0][0][0]), int(line[0][0][1]),
-                         int(line[0][2][0]), int(line[0][2][1])],
-                "text": line[1][0],
-                "confidence": float(line[1][1]),
-            }
-            for line in results[0]
-        ]
+        regions = []
+        for page_result in results:
+            texts = page_result.get('rec_texts', []) if isinstance(page_result, dict) else getattr(page_result, 'rec_texts', [])
+            scores = page_result.get('rec_scores', []) if isinstance(page_result, dict) else getattr(page_result, 'rec_scores', [])
+            polys = page_result.get('dt_polys', []) if isinstance(page_result, dict) else getattr(page_result, 'dt_polys', [])
+            for i, text in enumerate(texts):
+                bbox = [0, 0, 0, 0]
+                if i < len(polys) and len(polys[i]) >= 4:
+                    poly = polys[i]
+                    bbox = [int(poly[0][0]), int(poly[0][1]),
+                            int(poly[2][0]), int(poly[2][1])]
+                conf = float(scores[i]) if i < len(scores) else 0.0
+                regions.append({
+                    "bbox": bbox,
+                    "text": str(text),
+                    "confidence": conf,
+                })
+        return regions
+
+    def detect_formula_regions(self, image_data: bytes) -> list:
+        """Detect potential formula regions by low-confidence + math symbol heuristics.
+        Returns list of tight bounding boxes suitable for PP-FormulaNet cropping."""
+        regions = self.extract_text(image_data)
+        formula_boxes = []
+        math_pattern = re.compile(r'[=+\-×÷∫∑√∞∂Δπθ≤≥±→←↑↓⇒]|\\frac|\\int|\\sum|[a-z]=|=[a-z]')
+        for r in regions:
+            conf = r["confidence"]
+            text = r["text"]
+            score = 0
+            if conf < 0.95:
+                score += 2
+            if math_pattern.search(text):
+                score += 3
+            if len(text) < 15 and any(c.isdigit() for c in text):
+                score += 1
+            if score >= 3:
+                bbox = r["bbox"]
+                # Add small padding
+                pad = 5
+                formula_boxes.append([
+                    max(0, bbox[0] - pad),
+                    max(0, bbox[1] - pad),
+                    bbox[2] + pad,
+                    bbox[3] + pad,
+                ])
+        return formula_boxes
 
     def extract_tables(self, image_data: bytes) -> list:
         """Extract tables using PPStructureV3 (PaddleOCR 3.x)."""
@@ -234,7 +272,7 @@ class PaddleOCREngine:
             from PIL import Image
             img = Image.open(io.BytesIO(image_data))
             arr = np.array(img)
-            results = engine(arr)
+            results = engine.predict(arr)
             tables = []
             for item in results:
                 item_type = item.get('type', '')

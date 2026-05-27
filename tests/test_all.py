@@ -207,6 +207,30 @@ for code in ['9701','9702','9708','9709']:
 try:
     from agent.ocr.vision import grade_homework, analyze_diagram
     test("6.6 Vision imports", lambda: True)
+
+# 6.7 PaddleOCR text extraction (3.x API)
+try:
+    from agent.ocr.pipeline import PaddleOCREngine
+    import numpy as np
+    from PIL import Image
+    # Test with a simple white image — should not crash
+    white = np.ones((100, 200, 3), dtype=np.uint8) * 255
+    img = Image.fromarray(white)
+    import io
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    engine = PaddleOCREngine()
+    regions = engine.extract_text(buf.getvalue())
+    test("6.7 PaddleOCR text extraction (no crash)", lambda: isinstance(regions, list))
+except Exception as e:
+    test(f"6.7 PaddleOCR: {str(e)[:80]}", lambda: False)
+
+# 6.8 Formula region detection
+try:
+    boxes = engine.detect_formula_regions(buf.getvalue())
+    test("6.8 Formula region detection (no crash)", lambda: isinstance(boxes, list))
+except Exception as e:
+    test(f"6.8 Formula detection: {str(e)[:80]}", lambda: False)
 except Exception as e:
     test("6.6 Vision imports", lambda: False)
 

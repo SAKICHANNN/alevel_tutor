@@ -294,11 +294,33 @@ class PaddleOCREngine:
 # ── Formula / LaTeX OCR Engines ──
 
 class FormulaOCREngine:
-    """Formula OCR using PP-FormulaNet_plus-L (PaddleOCR) + MathPix API fallback."""
+    """Formula OCR: PP-FormulaNet (fast) → Qwen VLM (accurate fallback) → MathPix (paid fallback)."""
 
     def __init__(self):
         self._formula_ocr = None
         self._init_attempted = False
+        self._vlm_available = None
+
+    @staticmethod
+    def _is_garbled_formula(latex: str) -> bool:
+        """Check if LaTeX output has artifacts indicating poor quality."""
+        if not latex or len(latex) < 5:
+            return True
+        garbled_markers = [
+            r'\mathrm{\tt',   
+            r'\bf',           
+            r'\begin{dmath*}',  # PP-FormulaNet failed layout detection
+            r'\underline{\underline',  # Nested underline = layout failure
+            'qquad' * 5,      
+        ]
+        for marker in garbled_markers:
+            if marker in latex:
+                return True
+        # Formula should contain recognizable math
+        has_math = any(c in latex for c in '=+-*/^_(){}\\')
+        if not has_math and len(latex) > 20:
+            return True  # Long output without math = likely text OCR'd as formula
+        return False
 
     def _init_pp_formulanet(self) -> bool:
         if self._init_attempted:
@@ -334,19 +356,55 @@ class FormulaOCREngine:
         except Exception as e:
             console.print(f"[dim]PP-FormulaNet OCR failed: {e}[/dim]")
         return []
+    
+    def _try_vlm_ocr(self, image_data: bytes) -> list:
+        """Use local Qwen VLM via LM Studio as OCR fallback for formulas."""
         try:
-            result = self._formula_ocr.predict(
-                image_data,
-                batch_size=1,
+            from agent.config import get_active_vision_model
+            config = get_active_vision_model()
+            if not config or not config.api_key or config.provider == "zhipu":
+                return []  # Only use local VLM, not cloud
+
+            b64 = base64.b64encode(image_data).decode()
+            resp = requests.post(
+                f"{config.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {config.api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": config.model,
+                    "messages": [{"role": "user", "content": [
+                        {"type": "text", "text": "Extract ONLY the mathematical formula as LaTeX. Output nothing else. No markdown, no $$."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                    ]}],
+                    "temperature": 0.1,
+                    "max_tokens": 400,
+                },
+                timeout=120,
             )
-            if result:
-                tex = result.get("formula", "")
-                conf = result.get("confidence", 0.8)
-                if tex:
-                    return [{"latex": tex, "confidence": conf}]
+            data = resp.json()
+            tex = data["choices"][0]["message"]["content"].strip()
+            tex = tex.removeprefix("```latex").removesuffix("```").strip()
+            # Remove $$ wrappers if present
+            tex = re.sub(r'^\$\$?\s*', '', tex)
+            tex = re.sub(r'\s*\$\$?$', '', tex)
+            if tex and not self._is_garbled_formula(tex):
+                console.print(f"[dim]Qwen VLM OCR fallback succeeded[/dim]")
+                return [{"latex": tex, "confidence": 0.90}]
         except Exception as e:
-            console.print(f"[dim]PP-FormulaNet OCR failed: {e}[/dim]")
+            console.print(f"[dim]VLM OCR fallback failed: {e}[/dim]")
         return []
+
+    def extract_formulas(self, image_data: bytes) -> list:
+        """Extract LaTeX formulas. PP-FormulaNet first, Qwen VLM fallback if garbled."""
+        results = self._try_pp_formulanet(image_data)
+        if results and not self._is_garbled_formula(results[0].get("latex", "")):
+            return results
+        vlm_results = self._try_vlm_ocr(image_data)
+        if vlm_results:
+            return vlm_results
+        if results:
+            results[0]["confidence"] = 0.3
+            return results
+        return self._try_mathpix(image_data)
 
     def _try_mathpix(self, image_data: bytes) -> list:
         import os

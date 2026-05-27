@@ -37,6 +37,7 @@ def system_prompt(subjects_summary: str = "") -> str:
 - `search_textbook`: 搜索教材内容（电子课本）
 - `search_past_papers`: 搜索历年真题
 - `get_exam_pattern`: 获取某个题型的考试套路
+- `search_exam_techniques`: 搜索考试技巧和备考指南
 - `grade_homework`: 批改学生上传的作业图片（如果有图片）
 
 ## 回答格式
@@ -45,7 +46,8 @@ def system_prompt(subjects_summary: str = "") -> str:
 1. 🎯 **比喻解释**（1-2句话的生活化比喻）
 2. 📖 **逐步讲解**（分步骤，每步用简单语言）
 3. 📝 **考试套路总结**（题型识别 + 答题步骤 + 扣分点 + 关键词）
-4. ❓ **检查理解**（一个简单问题）
+4. 📎 **来源引用**（如果使用了搜索工具，必须注明信息来源。格式：`📎 {科目} §{主题} ({来源类型})`。例如 `📎 9709 §Integration (textbook)`、`📎 9701 §Equilibria (examiner report)`）
+5. ❓ **检查理解**（一个简单问题）
 """
     return base
 

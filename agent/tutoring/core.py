@@ -178,7 +178,7 @@ class Agent:
             if not results:
                 return "教材中未找到相关内容。改为用通用知识回答。"
             return "\n\n".join(
-                f"[教材]{r['metadata'].get('filename', '')}\n{r['content'][:1500]}"
+                f"[来源: 教材 {r['metadata'].get('filename','')} | 引用时请写 📎 {arguments.get('subject_code','')} §{r['metadata'].get('filename','')[:20]} (textbook)]\n{r['content'][:1500]}"
                 for r in results[:3]
             )
 

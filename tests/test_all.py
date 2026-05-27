@@ -207,17 +207,18 @@ for code in ['9701','9702','9708','9709']:
 try:
     from agent.ocr.vision import grade_homework, analyze_diagram
     test("6.6 Vision imports", lambda: True)
+except Exception as e:
+    test("6.6 Vision imports", lambda: False)
 
 # 6.7 PaddleOCR text extraction (3.x API)
 try:
     from agent.ocr.pipeline import PaddleOCREngine
     import numpy as np
     from PIL import Image
-    # Test with a simple white image — should not crash
+    import io as _io
     white = np.ones((100, 200, 3), dtype=np.uint8) * 255
     img = Image.fromarray(white)
-    import io
-    buf = io.BytesIO()
+    buf = _io.BytesIO()
     img.save(buf, format='PNG')
     engine = PaddleOCREngine()
     regions = engine.extract_text(buf.getvalue())

@@ -51,26 +51,56 @@ def _get_client():
 
 
 def _get_embedding_fn():
-    """Try to get an embedding function. Falls back to chroma's default."""
+    """Get embedding function. Tries Ollama qwen3-embedding first, falls back to sentence-transformers."""
     import os
-    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("DEEPSEEK_API_KEY")
-    if api_key and HAS_OPENAI:
-        try:
-            return embedding_functions.OpenAIEmbeddingFunction(
-                api_key=api_key,
-                model_name="text-embedding-3-small",
-            )
-        except Exception:
-            pass
-    # Fallback: use sentence-transformers if available
+
+    # Try Ollama local embedding (free, fast, domain-specific)
+    try:
+        import requests as _req
+        _resp = _req.get("http://localhost:11434/api/tags", timeout=3)
+        if _resp.status_code == 200:
+            models = [m["name"] for m in _resp.json().get("models", [])]
+            embedding_models = [m for m in models if "embed" in m.lower()]
+            if embedding_models:
+                # Prefer smallest for indexing speed
+                def _model_size(name):
+                    try:
+                        n = name.split(":")[-1].replace("b","")
+                        return float(n)
+                    except: return 999
+                embedding_models.sort(key=_model_size)
+                model = embedding_models[0]
+                console.print(f"[dim]Ollama ({len(embedding_models)} found, using {model})[/dim]")
+                return OllamaEmbedFn(model_name=model)
+    except Exception:
+        pass
+
+    # Fallback: sentence-transformers (free, self-hosted)
     try:
         return embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name="all-MiniLM-L6-v2"
         )
     except Exception:
         pass
-    # Last resort: chroma default
+
     return None
+
+
+class OllamaEmbedFn:
+    """Custom embedding function using Ollama /api/embed endpoint."""
+    def __init__(self, model_name: str = "qwen3-embedding:0.6b", base_url: str = "http://localhost:11434"):
+        self.model_name = model_name
+        self.url = f"{base_url}/api/embed"
+
+    def __call__(self, input: list) -> list:
+        import requests as _req
+        resp = _req.post(
+            self.url,
+            json={"model": self.model_name, "input": input},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        return resp.json()["embeddings"]
 
 
 def _extract_text_from_pdf(pdf_path: Path) -> str:

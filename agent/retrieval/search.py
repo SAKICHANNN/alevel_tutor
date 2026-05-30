@@ -24,6 +24,46 @@ def _get_or_create_db():
     return client
 
 
+_QUERY_EMBED_FN = None
+
+
+def _get_query_embed_fn():
+    """Get Ollama embedding function for search queries — matches builder."""
+    global _QUERY_EMBED_FN
+    if _QUERY_EMBED_FN is not None:
+        return _QUERY_EMBED_FN
+    try:
+        import requests as _req
+        _resp = _req.get("http://localhost:11434/api/tags", timeout=3)
+        if _resp.status_code == 200:
+            models = [m["name"] for m in _resp.json().get("models", [])]
+            emb_models = [m for m in models if "embed" in m.lower()]
+            if emb_models:
+                from agent.retrieval.builder import OllamaEmbedFn
+                emb_models.sort(key=lambda x: float(x.split(":")[-1].replace("b","")) if ":" in x else 999)
+                _QUERY_EMBED_FN = OllamaEmbedFn(model_name=emb_models[0])
+    except Exception:
+        pass
+    return _QUERY_EMBED_FN
+
+
+def _query_with_ollama(collection, query: str, n_results: int, where_filter=None, include=None):
+    """Query using Ollama embeddings directly — avoids ChromaDB's stored embedding fn."""
+    ef = _get_query_embed_fn()
+    if ef and include is None:
+        include = ["documents", "metadatas", "distances"]
+    if ef:
+        emb = ef([query])[0]
+        return collection.query(
+            query_embeddings=[emb], n_results=n_results,
+            where=where_filter, include=include,
+        )
+    return collection.query(
+        query_texts=[query], n_results=n_results,
+        where=where_filter, include=include,
+    )
+
+
 def search_textbooks(query: str, subject_code: Optional[str] = None, n_results: int = 5) -> list:
     """Search textbook content by semantic similarity."""
     client = _get_or_create_db()
@@ -36,12 +76,7 @@ def search_textbooks(query: str, subject_code: Optional[str] = None, n_results: 
     if subject_code:
         where_filter = {"subject": subject_code}
 
-    results = collection.query(
-        query_texts=[query],
-        n_results=n_results,
-        where=where_filter,
-        include=["documents", "metadatas", "distances"],
-    )
+    results = _query_with_ollama(collection, query, n_results, where_filter)
     return _format_results(results, "textbooks")
 
 
@@ -72,12 +107,7 @@ def search_past_papers(
         # ChromaDB requires $and for multiple filter operators
         where_filter = {"$and": [{k: v} for k, v in where_filter.items()]}
 
-    results = collection.query(
-        query_texts=[query],
-        n_results=n_results,
-        where=where_filter,
-        include=["documents", "metadatas", "distances"],
-    )
+    results = _query_with_ollama(collection, query, n_results, where_filter)
     return _format_results(results, "past_papers")
 
 
@@ -200,10 +230,5 @@ def search_techniques(query: str, subject_code: str = None, n_results: int = 3) 
     if subject_code:
         where_filter = {"subject": subject_code}
 
-    results = collection.query(
-        query_texts=[query],
-        n_results=n_results,
-        where=where_filter,
-        include=["documents", "metadatas", "distances"],
-    )
+    results = _query_with_ollama(collection, query, n_results, where_filter)
     return _format_results(results, "techniques")

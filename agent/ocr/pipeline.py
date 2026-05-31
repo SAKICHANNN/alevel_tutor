@@ -763,13 +763,22 @@ def extract_images_from_pdf(pdf_path: str, subject_code: str, page_range: tuple 
         page = doc[pg]
         text = page.get_text()
         text_len = len(text.strip())
+        text_lower = text.lower()
         drawings = page.get_drawings()
         imgs = page.get_images(full=True)
         n_visual = len(drawings) + len(imgs)
 
-        # Skip text-only pages (adjust threshold based on content)
-        is_text_only = text_len > 100 and n_visual == 0
-        if is_text_only:
+        # Skip cover pages / blank pages / instruction pages
+        cover_keywords = ['cambridge international', 'candidate name', 'centre number',
+                         'candidate number', 'blank page', 'data booklet', 'formula sheet']
+        is_cover = any(kw in text_lower for kw in cover_keywords)
+        is_blank = text_len < 50 and n_visual == 0
+        is_many_layout_vectors = len(drawings) > 50 and text_len < 1500  # layout boxes, not diagrams
+        if is_cover or is_blank or is_many_layout_vectors:
+            continue
+        
+        # Skip text-only pages
+        if text_len > 500 and n_visual == 0:
             continue
         
         # Skip pages with too few visual elements

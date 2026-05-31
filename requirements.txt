@@ -12,3 +12,4 @@ numpy>=1.21.0
 fastapi>=0.100.0
 uvicorn>=0.20.0
 python-dotenv>=1.0.0
+gradio>=4.0.0

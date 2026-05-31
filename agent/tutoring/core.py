@@ -26,6 +26,7 @@ from agent.database import (
     save_message, save_grading_result, log_cost, log_error, check_budget,
     create_conversation, update_conversation,
 )
+from agent.security import detect_injection, validate_tool_call, sanitize_retrieved_content
 
 console = Console()
 
@@ -214,6 +215,13 @@ class Agent:
 
     def _execute_tool(self, tool_name: str, arguments: dict) -> str:
         """Execute a tool call and return the result as a string."""
+        # W5: Validate tool call is from allowed set
+        valid, reason = validate_tool_call(tool_name, arguments)
+        if not valid:
+            log_error("tool_fail", f"core.py:_execute_tool({tool_name})",
+                      f"Blocked: {reason}", self.conv_id, self.current_subject)
+            return f"工具调用被安全策略拦截: {reason}"
+
         console.print(f"[dim]🔧 调用工具: {tool_name}...[/dim]")
 
         if tool_name == "search_textbook":
@@ -224,10 +232,10 @@ class Agent:
             )
             if not results:
                 return "教材中未找到相关内容。改为用通用知识回答。"
-            return "\n\n".join(
+            return sanitize_retrieved_content("\n\n".join(
                 f"[来源: 教材 {r['metadata'].get('filename','')} | 引用时请写 📎 {arguments.get('subject_code','')} §{r['metadata'].get('filename','')[:20]} (textbook)]\n{r['content'][:1500]}"
                 for r in results[:3]
-            )
+            ))
 
         elif tool_name == "search_past_paper":
             results = search_past_papers(
@@ -319,6 +327,19 @@ class Agent:
 
     def chat(self, user_input: str, image_path: Optional[str] = None) -> str:
         """Process a chat message with optional image."""
+        # W5: Prompt injection guard — check before processing
+        is_injection, reason = detect_injection(user_input)
+        if is_injection:
+            log_error("api_call", "core.py:chat(injection_blocked)",
+                      f"Injection blocked: {reason}", self.conv_id, self.current_subject)
+            blocked_msg = f"⚠️ 安全拦截：检测到不当指令。请重新提问。"
+            self.conversation.append({"role": "assistant", "content": blocked_msg})
+            if self.conv_id:
+                save_message(self.conv_id, "user", user_input[:100] + "...")
+                save_message(self.conv_id, "assistant", blocked_msg)
+            return blocked_msg
+
+        # Detect subject
         detected = self._detect_subject(user_input)
         if detected and detected != self.current_subject:
             self.current_subject = detected

@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  web:
+    build: .
+    container_name: alevel_tutor_web
+    ports:
+      - "7860:7860"
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - ZHIPU_API_KEY=${ZHIPU_API_KEY:-}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
+      - BUDGET_MONTHLY_CNY=${BUDGET_MONTHLY_CNY:-50}
+      - BUDGET_DAILY_CNY=${BUDGET_DAILY_CNY:-2}
+      - OLLAMA_HOST=host.docker.internal
+      - LMSTUDIO_BASE_URL=http://host.docker.internal:1234/v1
+    volumes:
+      - ./data/chroma_db:/app/data/chroma_db:ro
+      - ./data/tutor.db:/app/data/tutor.db
+      - ./data/backups:/app/data/backups
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # Optional: Ollama service (if you prefer containerized Ollama)
+  # Uncomment below and set OLLAMA_HOST=ollama in web environment
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: alevel_tutor_ollama
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   ports:
+  #     - "11434:11434"
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+
+# volumes:
+#   ollama_data:

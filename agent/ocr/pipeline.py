@@ -725,3 +725,90 @@ def get_pipeline() -> OCRPipeline:
     if _pipeline_instance is None:
         _pipeline_instance = OCRPipeline()
     return _pipeline_instance
+
+
+def extract_images_from_pdf(pdf_path: str, subject_code: str, page_range: tuple = None) -> list:
+    """Extract and analyze images/charts/diagrams from a PDF.
+    
+    For vector graphics (most Cambridge papers): renders pages as high-res PNG.
+    For embedded raster images (textbooks): extracts and analyzes directly.
+    Both use Qwen VLM for content description.
+    
+    Returns list of {page, type, description}.
+    """
+    import fitz, io
+    from PIL import Image
+
+    doc = fitz.open(pdf_path)
+    if page_range:
+        start, end = page_range
+    else:
+        start, end = 0, len(doc)
+
+    vision = VisionAnalyzer()
+    results = []
+
+    for pg in range(start, min(end, len(doc))):
+        page = doc[pg]
+
+        # Check for embedded raster images
+        imgs = page.get_images(full=True)
+        for img_idx, img_info in enumerate(imgs):
+            xref = img_info[0]
+            base_image = doc.extract_image(xref)
+            img_bytes = base_image["image"]
+            ext = base_image["ext"]
+
+            if len(img_bytes) > 5000:
+                # Analyze embedded image
+                desc = vision._call_vision(
+                    img_bytes,
+                    f"Analyze this image from a Cambridge A-Level {subject_code} document. "
+                    "Describe any diagrams, charts, chemical structures, or graphs. "
+                    "Extract labels, data values, and key concepts. Keep under 200 words.",
+                    max_tokens=500,
+                )
+                results.append({"page": pg + 1, "type": f"embedded_{ext}", "description": desc})
+
+        # Render page as high-res image for vector graphics analysis
+        pix = page.get_pixmap(dpi=200)
+        page_img = pix.tobytes("png")
+
+        # Quick check if page has visual content
+        drawings = page.get_drawings()
+        if len(drawings) > 2 or len(imgs) > 0:
+            desc = vision._call_vision(
+                page_img,
+                f"Analyze this page from Cambridge A-Level {subject_code}. "
+                "Focus on ALL diagrams, graphs, charts, chemical structures, or images present. "
+                "For each: describe what it shows, what subject topic it relates to, and extract key labels/values. "
+                "Keep under 300 words.",
+                max_tokens=600,
+            )
+            results.append({
+                "page": pg + 1,
+                "type": f"page_render_{len(drawings)}_vectors",
+                "description": desc,
+            })
+
+    doc.close()
+    return results
+
+
+def analyze_image_file(image_path: str, subject_code: str = "") -> dict:
+    """Analyze any image file (PNG, JPG, etc.) for charts, diagrams, formulas.
+    Routes to Qwen VLM for comprehensive understanding."""
+    vision = VisionAnalyzer()
+    if not vision.available:
+        return {"error": "VLM not available. Start LM Studio with qwen/qwen3-vl-8b."}
+
+    with open(image_path, "rb") as f:
+        img_data = f.read()
+
+    desc = vision.full_page_parse(img_data, subject_code) if subject_code else vision._call_vision(
+        img_data,
+        "Analyze this image in detail. Extract all text, formulas (as LaTeX), tables (as markdown), "
+        "diagrams, charts, and graphs. Describe what each element shows.",
+        max_tokens=1200,
+    )
+    return {"path": image_path, "subject": subject_code, "description": desc}

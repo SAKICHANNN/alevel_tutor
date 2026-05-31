@@ -2,6 +2,7 @@
 """
 A-Level Tutor Agent CLI
 Interactive chat interface with homework grading and subject switching.
+W4: conversation persistence to SQLite.
 """
 import os
 import sys
@@ -18,6 +19,7 @@ from rich.syntax import Syntax
 from agent.tutoring.core import Agent
 from agent.tutoring.prompts import welcome_message
 from agent.config import MODELS, SUBJECTS, SUBJECT_BY_CODE
+from agent.database import create_conversation, get_conversation, list_conversations
 
 console = Console()
 
@@ -28,7 +30,8 @@ class TutorCLI(cmd.Cmd):
 
     def __init__(self):
         super().__init__()
-        self.agent = Agent()
+        conv_id = create_conversation(title="CLI Session")
+        self.agent = Agent(conv_id=conv_id)
         self._check_api_keys()
 
     def _check_api_keys(self):
@@ -110,19 +113,41 @@ class TutorCLI(cmd.Cmd):
         except Exception as e:
             console.print(f"[red]分析失败: {e}[/red]")
 
+    def do_cost(self, arg: str):
+        """显示API成本统计"""
+        from agent.database import get_total_cost, get_daily_costs, check_budget
+        total = get_total_cost()
+        daily = get_daily_costs()
+        ok, msg = check_budget()
+        console.print(f"  [bold]成本统计[/bold]")
+        console.print(f"  累计调用: {total.get('calls', 0)} 次")
+        console.print(f"  累计 tokens: {total.get('total_tokens', 0):,}")
+        console.print(f"  累计费用: ¥{total.get('cost_cny', 0):.4f} (${total.get('cost_usd', 0):.4f})")
+        console.print(f"  预算状态: {'[green]正常[/green]' if ok else '[red]超限[/red]'} — {msg}")
+        if daily:
+            console.print(f"\n  最近每日:")
+            for d in daily[:7]:
+                console.print(f"    {d['day']}: ¥{d['cost_cny']:.4f} / {d['tokens']:,} tokens / {d['calls']} calls")
+
     def do_reset(self, arg: str):
         """重置对话"""
         self.agent.reset()
         console.print("[green]对话已重置。[/green]")
 
     def do_stats(self, arg: str):
-        """显示知识库统计"""
-        from agent.retriever import get_collection_stats
+        """显示知识库统计和成本信息"""
+        from agent.retrieval.search import get_collection_stats
+        from agent.database import get_total_cost
         stats = get_collection_stats()
         for name, info in stats.items():
             console.print(f"  [cyan]{name}[/cyan]: {info['count']} chunks")
         if stats.get("textbooks", {}).get("count", 0) == 0:
             console.print("\n[yellow]知识库为空。运行 python3 build_kb.py 构建索引。[/yellow]")
+        cost = get_total_cost()
+        if cost.get("calls", 0) > 0:
+            console.print(f"\n  [dim]API 调用: {cost['calls']} 次, "
+                         f"¥{cost.get('cost_cny', 0):.4f} / "
+                         f"${cost.get('cost_usd', 0):.4f}[/dim]")
 
     def do_model(self, arg: str):
         """显示当前使用的模型"""

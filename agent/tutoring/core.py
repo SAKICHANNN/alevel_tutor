@@ -1,10 +1,13 @@
 """
 Core agent: multi-provider LLM routing, tool calling, conversation management.
 Uses parameterized subject system — add new boards/subjects via JSON config.
+
+W4 updates: cost logging, error logging, conversation persistence, BudgetGuard.
 """
 import json
 import re
 import time
+import traceback
 from datetime import datetime
 from typing import Optional
 
@@ -19,6 +22,10 @@ from agent.retrieval.search import search_textbooks, search_past_papers, get_col
 from agent.tutoring.patterns import get_pattern, format_pattern_for_prompt, PATTERNS
 from agent.ocr.vision import grade_homework, analyze_diagram
 from agent.retrieval.search import search_techniques as _search_techniques
+from agent.database import (
+    save_message, save_grading_result, log_cost, log_error, check_budget,
+    create_conversation, update_conversation,
+)
 
 console = Console()
 
@@ -105,7 +112,7 @@ TOOLS = [
 
 
 class Agent:
-    def __init__(self, subjects: list = None):
+    def __init__(self, subjects: list = None, conv_id: int = None):
         self.subjects = subjects or SUBJECTS
         self._subjects_summary = " · ".join(
             f"{s.code} {s.name}" for s in self.subjects
@@ -114,12 +121,19 @@ class Agent:
             {"role": "system", "content": system_prompt(self._subjects_summary)},
         ]
         self.current_subject = None
-        self._pending_image = None  # Temp image path for grade_homework_image tool
+        self._pending_image = None
+        self.conv_id = conv_id  # SQLite conversation ID for persistence
 
-    def _call_llm(self, messages: list, model_key: str = "tutor", max_retries: int = 2) -> dict:
+    def _call_llm(self, messages: list, model_key: str = "tutor", max_retries: int = 2,
+                  tools_list: list = TOOLS) -> dict:
         config = MODELS[model_key]
         if not config.api_key:
             raise ValueError(f"No API key configured for {model_key}. Set environment variables.")
+
+        # BudgetGuard check
+        ok, budget_msg = check_budget()
+        if not ok:
+            raise RuntimeError(f"预算限制: {budget_msg}")
 
         headers = {
             "Authorization": f"Bearer {config.api_key}",
@@ -131,14 +145,15 @@ class Agent:
             "messages": messages,
             "temperature": config.temperature,
             "max_tokens": config.max_tokens,
-            "tools": TOOLS,
-            "tool_choice": "auto",
         }
-        # Enable DeepSeek thinking mode for reasoner
+        if tools_list:
+            payload["tools"] = tools_list
+            payload["tool_choice"] = "auto"
         if config.thinking:
             payload["thinking"] = {"type": "enabled"}
 
         last_error = None
+        t0 = time.time()
         for attempt in range(max_retries + 1):
             try:
                 resp = requests.post(
@@ -148,7 +163,22 @@ class Agent:
                     timeout=120,
                 )
                 resp.raise_for_status()
-                return resp.json()
+                result = resp.json()
+                latency_ms = int((time.time() - t0) * 1000)
+
+                # Log cost from usage info
+                usage = result.get("usage", {})
+                if usage:
+                    log_cost(
+                        model_key=model_key,
+                        model_name=config.model,
+                        prompt_tokens=usage.get("prompt_tokens", 0),
+                        completion_tokens=usage.get("completion_tokens", 0),
+                        reasoning_tokens=usage.get("completion_tokens_details", {}).get("reasoning_tokens", 0),
+                        latency_ms=latency_ms,
+                        conversation_id=self.conv_id,
+                    )
+                return result
             except requests.exceptions.HTTPError as e:
                 status = e.response.status_code if e.response is not None else 0
                 if status == 429 and attempt < max_retries:
@@ -158,11 +188,27 @@ class Agent:
                     time.sleep(1)
                     continue
                 last_error = e
+                log_error(
+                    error_type="api_call",
+                    error_source=f"core.py:_call_llm({model_key})",
+                    error_message=f"HTTP {status}: {str(e)[:200]}",
+                    conversation_id=self.conv_id,
+                    subject_code=self.current_subject,
+                    stack_trace=traceback.format_exc()[-500:],
+                )
             except requests.exceptions.RequestException as e:
                 if attempt < max_retries:
                     time.sleep(1)
                     continue
                 last_error = e
+                log_error(
+                    error_type="api_call",
+                    error_source=f"core.py:_call_llm({model_key})",
+                    error_message=str(e)[:200],
+                    conversation_id=self.conv_id,
+                    subject_code=self.current_subject,
+                    stack_trace=traceback.format_exc()[-500:],
+                )
 
         raise last_error or RuntimeError(f"LLM call failed after {max_retries+1} attempts")
 
@@ -174,6 +220,7 @@ class Agent:
             results = search_textbooks(
                 arguments.get("query", ""),
                 arguments.get("subject_code"),
+                use_rerank=True,
             )
             if not results:
                 return "教材中未找到相关内容。改为用通用知识回答。"
@@ -187,6 +234,7 @@ class Agent:
                 arguments.get("query", ""),
                 arguments.get("subject_code"),
                 arguments.get("paper_type"),
+                use_rerank=True,
             )
             if not results:
                 return "未找到匹配的真题。改为用通用知识回答。"
@@ -271,16 +319,18 @@ class Agent:
 
     def chat(self, user_input: str, image_path: Optional[str] = None) -> str:
         """Process a chat message with optional image."""
-        # Detect subject
         detected = self._detect_subject(user_input)
         if detected and detected != self.current_subject:
             self.current_subject = detected
+            if self.conv_id:
+                update_conversation(self.conv_id, subject_code=detected)
 
-        # Build user message
         user_msg = {"role": "user", "content": user_input}
         self.conversation.append(user_msg)
 
-        # If image provided, handle it here (vision model handles separately for now)
+        if self.conv_id:
+            save_message(self.conv_id, "user", user_input)
+
         if image_path:
             try:
                 subject = self.current_subject or "未知科目"
@@ -289,33 +339,42 @@ class Agent:
                     "role": "assistant",
                     "content": f"📸 **作业批改结果**\n\n{grading_result}",
                 })
+                if self.conv_id:
+                    save_message(self.conv_id, "assistant",
+                                 f"📸 **作业批改结果**\n\n{grading_result}",
+                                 citation_chips=[f"{subject}§grading"])
                 return grading_result
             except Exception as e:
                 error_msg = f"批改失败: {str(e)}。请确保设置了 ZHIPU_API_KEY 或 DASHSCOPE_API_KEY。"
                 self.conversation.append({"role": "assistant", "content": error_msg})
+                if self.conv_id:
+                    save_message(self.conv_id, "assistant", error_msg)
+                log_error("vision_fail", "core.py:chat(image)", str(e),
+                          self.conv_id, self.current_subject)
                 return error_msg
 
-        # Prepare messages for API (keep last 20 to manage context)
-        api_messages = [self.conversation[0]]  # system prompt
-        api_messages.extend(self.conversation[-19:])  # last 19 messages
+        api_messages = [self.conversation[0]]
+        api_messages.extend(self.conversation[-19:])
 
-        # Call LLM
         with console.status("[cyan]思考中...[/cyan]"):
             try:
                 response = self._call_llm(api_messages)
             except Exception as e:
                 error_msg = f"❌ 调用 LLM 失败: {str(e)}\n请检查 API key 是否设置正确。"
                 self.conversation.append({"role": "assistant", "content": error_msg})
+                if self.conv_id:
+                    save_message(self.conv_id, "assistant", error_msg)
                 return error_msg
 
         msg = response["choices"][0]["message"]
 
-        # Handle tool calls recursively
         max_tool_rounds = 3
         for _ in range(max_tool_rounds):
             if msg.get("tool_calls"):
-                # Add assistant message with tool calls
                 api_messages.append(msg)
+                if self.conv_id:
+                    save_message(self.conv_id, "assistant", msg.get("content", ""),
+                                 tool_calls=msg["tool_calls"])
 
                 for tool_call in msg["tool_calls"]:
                     tool_name = tool_call["function"]["name"]
@@ -323,23 +382,38 @@ class Agent:
                         arguments = json.loads(tool_call["function"]["arguments"])
                     except json.JSONDecodeError:
                         arguments = {}
-                    tool_result = self._execute_tool(tool_name, arguments)
+                    try:
+                        tool_result = self._execute_tool(tool_name, arguments)
+                    except Exception as e:
+                        tool_result = f"Tool error: {e}"
+                        log_error("tool_fail", f"core.py:_execute_tool({tool_name})",
+                                  str(e), self.conv_id, self.current_subject)
 
                     api_messages.append({
                         "role": "tool",
                         "tool_call_id": tool_call["id"],
                         "content": tool_result,
                     })
+                    if self.conv_id:
+                        save_message(self.conv_id, "tool", tool_result,
+                                     tool_call_id=tool_call["id"])
 
-                # Get next response
-                response = self._call_llm(api_messages)
+                try:
+                    response = self._call_llm(api_messages)
+                except Exception as e:
+                    error_msg = f"❌ 工具调用后 LLM 失败: {str(e)}"
+                    self.conversation.append({"role": "assistant", "content": error_msg})
+                    if self.conv_id:
+                        save_message(self.conv_id, "assistant", error_msg)
+                    return error_msg
                 msg = response["choices"][0]["message"]
             else:
                 break
 
-        # Extract final response
         final_content = msg.get("content", "")
         self.conversation.append({"role": "assistant", "content": final_content})
+        if self.conv_id:
+            save_message(self.conv_id, "assistant", final_content)
 
         return final_content
 
@@ -348,6 +422,8 @@ class Agent:
             {"role": "system", "content": system_prompt(self._subjects_summary)},
         ]
         self.current_subject = None
+        if self.conv_id:
+            self.conv_id = create_conversation()
 
     def grade(self, question: str, mark_scheme: str, student_answer: str) -> dict:
         """Grade a student answer against a mark scheme. Returns structured JSON."""
@@ -360,12 +436,22 @@ class Agent:
         ]
 
         try:
-            resp = self._call_llm(messages, model_key="fast")
+            resp = self._call_llm(messages, model_key="tutor", tools_list=[])
             content = resp["choices"][0]["message"]["content"]
             content = content.strip().removeprefix("```json").removesuffix("```").strip()
-            return json.loads(content)
+            result = json.loads(content)
+            if self.conv_id:
+                save_grading_result(
+                    self.conv_id, result,
+                    question=question, mark_scheme=mark_scheme,
+                    student_answer=student_answer,
+                )
+            return result
         except (json.JSONDecodeError, KeyError) as e:
             console.print(f"[yellow]Grading JSON parse failed: {e}[/yellow]")
+            log_error("parse_fail", "core.py:grade", str(e),
+                      self.conv_id, self.current_subject,
+                      misconception_tags=["system_error"])
             return {
                 "score_awarded": 0, "score_max": 0, "confidence": 0.0,
                 "verdict": "评分系统出错，请重试",

@@ -64,8 +64,8 @@ def _query_with_ollama(collection, query: str, n_results: int, where_filter=None
     )
 
 
-def search_textbooks(query: str, subject_code: Optional[str] = None, n_results: int = 5) -> list:
-    """Search textbook content by semantic similarity."""
+def search_textbooks(query: str, subject_code: Optional[str] = None, n_results: int = 5, use_rerank: bool = False) -> list:
+    """Search textbook content by semantic similarity. Optionally rerank for precision."""
     client = _get_or_create_db()
     try:
         collection = client.get_collection("textbooks")
@@ -76,8 +76,16 @@ def search_textbooks(query: str, subject_code: Optional[str] = None, n_results: 
     if subject_code:
         where_filter = {"subject": subject_code}
 
-    results = _query_with_ollama(collection, query, n_results, where_filter)
-    return _format_results(results, "textbooks")
+    results = _query_with_ollama(collection, query, n_results * 2, where_filter)
+    formatted = _format_results(results, "textbooks")
+    
+    if use_rerank and formatted and len(formatted) > 1:
+        from agent.retrieval.reranker import rerank
+        formatted = rerank(query, formatted, top_n=n_results)
+    else:
+        formatted = formatted[:n_results]
+    
+    return formatted
 
 
 def search_past_papers(
@@ -86,8 +94,9 @@ def search_past_papers(
     paper_type: Optional[str] = None,
     topic: Optional[str] = None,
     n_results: int = 5,
+    use_rerank: bool = False,
 ) -> list:
-    """Search past paper questions and mark schemes."""
+    """Search past paper questions and mark schemes. Optionally rerank for precision."""
     client = _get_or_create_db()
     try:
         collection = client.get_collection("past_papers")
@@ -107,8 +116,14 @@ def search_past_papers(
         # ChromaDB requires $and for multiple filter operators
         where_filter = {"$and": [{k: v} for k, v in where_filter.items()]}
 
-    results = _query_with_ollama(collection, query, n_results, where_filter)
-    return _format_results(results, "past_papers")
+    results = _query_with_ollama(collection, query, n_results * 2, where_filter)
+    formatted = _format_results(results, "past_papers")
+    if use_rerank and formatted and len(formatted) > 1:
+        from agent.retrieval.reranker import rerank
+        formatted = rerank(query, formatted, top_n=n_results)
+    else:
+        formatted = formatted[:n_results]
+    return formatted
 
 
 def search_all(

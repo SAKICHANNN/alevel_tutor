@@ -727,17 +727,23 @@ def get_pipeline() -> OCRPipeline:
     return _pipeline_instance
 
 
-def extract_images_from_pdf(pdf_path: str, subject_code: str, page_range: tuple = None) -> list:
-    """Extract and analyze images/charts/diagrams from a PDF.
+def extract_images_from_pdf(pdf_path: str, subject_code: str, page_range: tuple = None, min_drawings: int = 0) -> list:
+    """Extract and analyze ALL images/charts/diagrams from any PDF.
     
-    For vector graphics (most Cambridge papers): renders pages as high-res PNG.
-    For embedded raster images (textbooks): extracts and analyzes directly.
-    Both use Qwen VLM for content description.
+    Handles:
+    - Vector graphics (Cambridge past papers, syllabus) → renders page as high-res PNG
+    - Embedded raster images (textbooks, study guides) → extracts and analyzes directly
+    Both analyzed by Qwen VLM.
     
-    Returns list of {page, type, description}.
+    Args:
+        pdf_path: Path to PDF file
+        subject_code: '9701'-'9709' for context-aware prompts
+        page_range: (start, end) page range, defaults to all pages
+        min_drawings: skip pages with fewer vector elements (0=analyze all non-text pages)
+    
+    Returns list of {page, type, description, text_ratio}.
     """
-    import fitz, io
-    from PIL import Image
+    import fitz
 
     doc = fitz.open(pdf_path)
     if page_range:
@@ -746,13 +752,33 @@ def extract_images_from_pdf(pdf_path: str, subject_code: str, page_range: tuple 
         start, end = 0, len(doc)
 
     vision = VisionAnalyzer()
+    if not vision.available:
+        doc.close()
+        return [{"error": "VLM not available. Start LM Studio with qwen/qwen3-vl-8b."}]
+
     results = []
+    total = end - start
 
     for pg in range(start, min(end, len(doc))):
         page = doc[pg]
-
-        # Check for embedded raster images
+        text = page.get_text()
+        text_len = len(text.strip())
+        drawings = page.get_drawings()
         imgs = page.get_images(full=True)
+        n_visual = len(drawings) + len(imgs)
+
+        # Skip text-only pages (adjust threshold based on content)
+        is_text_only = text_len > 100 and n_visual == 0
+        if is_text_only:
+            continue
+        
+        # Skip pages with too few visual elements
+        if n_visual <= min_drawings:
+            continue
+
+        page_result = {"page": pg + 1, "text_chars": text_len, "drawings": len(drawings), "images": len(imgs)}
+
+        # 1. Extract and analyze embedded raster images (textbooks)
         for img_idx, img_info in enumerate(imgs):
             xref = img_info[0]
             base_image = doc.extract_image(xref)
@@ -760,38 +786,40 @@ def extract_images_from_pdf(pdf_path: str, subject_code: str, page_range: tuple 
             ext = base_image["ext"]
 
             if len(img_bytes) > 5000:
-                # Analyze embedded image
+                console.print(f"[dim]  Page {pg+1}, embedded {ext} ({len(img_bytes)/1024:.0f}KB)...[/dim]")
                 desc = vision._call_vision(
                     img_bytes,
                     f"Analyze this image from a Cambridge A-Level {subject_code} document. "
-                    "Describe any diagrams, charts, chemical structures, or graphs. "
-                    "Extract labels, data values, and key concepts. Keep under 200 words.",
+                    "Describe any diagrams, charts, chemical structures, photos, or graphs. "
+                    "Extract labels, data values, and key concepts.",
                     max_tokens=500,
                 )
-                results.append({"page": pg + 1, "type": f"embedded_{ext}", "description": desc})
+                page_result[f"embedded_{img_idx}"] = desc
 
-        # Render page as high-res image for vector graphics analysis
-        pix = page.get_pixmap(dpi=200)
-        page_img = pix.tobytes("png")
-
-        # Quick check if page has visual content
-        drawings = page.get_drawings()
-        if len(drawings) > 2 or len(imgs) > 0:
+        # 2. Render full page for vector graphics analysis (past papers, syllabus)
+        if len(drawings) >= min_drawings or len(imgs) > 0:
+            pix = page.get_pixmap(dpi=200)
+            page_img = pix.tobytes("png")
+            text_ratio = text_len / max(len(page_img), 1)
+            
+            console.print(f"[dim]  Page {pg+1}/{start+total}: {len(drawings)} vectors, {len(imgs)} imgs...[/dim]")
             desc = vision._call_vision(
                 page_img,
-                f"Analyze this page from Cambridge A-Level {subject_code}. "
-                "Focus on ALL diagrams, graphs, charts, chemical structures, or images present. "
-                "For each: describe what it shows, what subject topic it relates to, and extract key labels/values. "
-                "Keep under 300 words.",
+                f"Analyze this page from Cambridge A-Level {subject_code} (page {pg+1}). "
+                "Focus ONLY on visual content: diagrams, graphs, charts, chemical structures, "
+                "circuit diagrams, force diagrams, economic models, or images. "
+                "For each visual element: describe what it shows, identify the topic, "
+                "and extract key labels, axes, values, or data points.",
                 max_tokens=600,
             )
-            results.append({
-                "page": pg + 1,
-                "type": f"page_render_{len(drawings)}_vectors",
-                "description": desc,
-            })
+            page_result["page_analysis"] = desc
+            page_result["text_ratio"] = round(text_ratio, 4)
+
+        if len(page_result) > 3:  # has actual analysis beyond metadata
+            results.append(page_result)
 
     doc.close()
+    console.print(f"[green]Extracted visual content from {len(results)}/{total} pages[/green]")
     return results
 
 

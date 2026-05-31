@@ -1,6 +1,19 @@
 """Comprehensive test suite for alevel_tutor — W1+W2 deliverables"""
 import os, json, sys, time, traceback
-os.environ['DEEPSEEK_API_KEY'] = 'REDACTED'
+
+# Load API key from .env or environment, never hardcode
+def _load_api_key():
+    env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
+    if os.path.exists(env_file):
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('DEEPSEEK_API_KEY='):
+                    key = line.split('=', 1)[1].strip().strip('"').strip("'")
+                    os.environ.setdefault('DEEPSEEK_API_KEY', key)
+                    return
+    os.environ.setdefault('DEEPSEEK_API_KEY', os.getenv('DEEPSEEK_API_KEY', ''))
+_load_api_key()
 
 PASS, FAIL, SKIP = 0, 0, 0
 

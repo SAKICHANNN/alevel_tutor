@@ -426,39 +426,17 @@ class Agent:
             self.conv_id = create_conversation()
 
     def grade(self, question: str, mark_scheme: str, student_answer: str) -> dict:
-        """Grade a student answer against a mark scheme. Returns structured JSON."""
-        from agent.tutoring.prompts import grading_prompt
+        """Grade a student answer. Uses PedCoT two-stage grading with real MS matching."""
+        from agent.grading.grader import grade as pedcot_grade
 
-        prompt = grading_prompt(question, mark_scheme, student_answer)
-        messages = [
-            {"role": "system", "content": "You are an A-Level examiner. Output valid JSON only. No markdown, no explanation."},
-            {"role": "user", "content": prompt},
-        ]
-
-        try:
-            resp = self._call_llm(messages, model_key="tutor", tools_list=[])
-            content = resp["choices"][0]["message"]["content"]
-            content = content.strip().removeprefix("```json").removesuffix("```").strip()
-            result = json.loads(content)
-            if self.conv_id:
-                save_grading_result(
-                    self.conv_id, result,
-                    question=question, mark_scheme=mark_scheme,
-                    student_answer=student_answer,
-                )
-            return result
-        except (json.JSONDecodeError, KeyError) as e:
-            console.print(f"[yellow]Grading JSON parse failed: {e}[/yellow]")
-            log_error("parse_fail", "core.py:grade", str(e),
-                      self.conv_id, self.current_subject,
-                      misconception_tags=["system_error"])
-            return {
-                "score_awarded": 0, "score_max": 0, "confidence": 0.0,
-                "verdict": "评分系统出错，请重试",
-                "rubric": {}, "strengths": [], "mistakes": [],
-                "misconception_tags": ["system_error"],
-                "next_step": "请重新提交批改", "citations": [],
-            }
+        result = pedcot_grade(
+            question=question,
+            student_answer=student_answer,
+            mark_scheme=mark_scheme if mark_scheme != "auto" else None,
+            conv_id=self.conv_id,
+            subject_code=self.current_subject,
+        )
+        return result
 
     def set_subject(self, subject_code: str):
         s = SUBJECT_BY_CODE.get(subject_code)

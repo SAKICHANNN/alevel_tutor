@@ -1,0 +1,303 @@
+{
+  "n_cases": 15,
+  "mae": 0.3,
+  "mae_normalised": 0.075,
+  "pearson_r": 0.898,
+  "pass_mae": true,
+  "pass_correlation": true,
+  "cases": [
+    {
+      "id": "P1-01",
+      "question": "Find the gradient of the curve y = x^3 - 3x^2 + 2x at the point where x = 2.",
+      "student_answer": "dy/dx = 3x^2 - 6x + 2\nAt x=2: 3(4) - 6(2) + 2 = 12 - 12 + 2 = 2\nGradient = 2...",
+      "gold_score": 2,
+      "agent_score": 2,
+      "max_marks": 2,
+      "error": 0,
+      "abs_error": 0,
+      "verdict": "正确",
+      "rubric": {
+        "correctness": 1,
+        "method": 1,
+        "representation": 1,
+        "communication": 1
+      },
+      "tags": []
+    },
+    {
+      "id": "P1-02",
+      "question": "Find the gradient of the curve y = x^3 - 3x^2 + 2x at the point where x = 2.",
+      "student_answer": "dy/dx = 3x^2 - 6x + 2\nAt x=2: 3(4) - 6(2) + 2 = 12 - 12 + 2 = 3\nGradient = 3...",
+      "gold_score": 1,
+      "agent_score": 1,
+      "max_marks": 2,
+      "error": 0,
+      "abs_error": 0,
+      "verdict": "部分正确",
+      "rubric": {
+        "correctness": 0.5,
+        "method": 1,
+        "representation": 1,
+        "communication": 1
+      },
+      "tags": [
+        "算术错误"
+      ]
+    },
+    {
+      "id": "P1-03",
+      "question": "Find the gradient of the curve y = x^3 - 3x^2 + 2x at the point where x = 2.",
+      "student_answer": "gradient = 3...",
+      "gold_score": 0,
+      "agent_score": 0,
+      "max_marks": 2,
+      "error": 0,
+      "abs_error": 0,
+      "verdict": "答案错误。正确答案是2，但学生回答为3，且未展示任何推导过程。",
+      "rubric": {
+        "correctness": 0,
+        "method": 0,
+        "representation": 1,
+        "communication": 1
+      },
+      "tags": [
+        "微分规则错误",
+        "代入计算错误"
+      ]
+    },
+    {
+      "id": "P1-04",
+      "question": "Solve the equation 2x^2 + 5x - 3 = 0, giving your answers exactly.",
+      "student_answer": "(2x - 1)(x + 3) = 0\nx = 1/2, x = -3...",
+      "gold_score": 3,
+      "agent_score": 2,
+      "max_marks": 3,
+      "error": 1,
+      "abs_error": 1,
+      "verdict": "完全正确",
+      "rubric": {
+        "correctness": 1,
+        "method": 1,
+        "representation": 1,
+        "communication": 1
+      },
+      "tags": []
+    },
+    {
+      "id": "P1-05",
+      "question": "Solve the equation 2x^2 + 5x - 3 = 0, giving your answers exactly.",
+      "student_answer": "Using formula: a=2, b=5, c=-3\nx = [-5 ± sqrt(25 - 4*2*(-3))] / (2*2)\nx = [-5 ± sqrt(25 + 24)] / 4\nx ...",
+      "gold_score": 3,
+      "agent_score": 3,
+      "max_marks": 3,
+      "error": 0,
+      "abs_error": 0,
+      "verdict": "答案完全正确，符合评分方案的所有要求",
+      "rubric": {
+        "correctness": 1,
+        "method": 1,
+        "representation": 1,
+        "communication": 1
+      },
+      "tags": []
+    },
+    {
+      "id": "P1-06",
+      "question": "Solve the equation 2x^2 + 5x - 3 = 0, giving your answers exactly.",
+      "student_answer": "x = -3 or x = 0.5...",
+      "gold_score": 1.5,
+      "agent_score": 1,
+      "max_marks": 3,
+      "error": 0.5,
+      "abs_error": 0.5,
+      "verdict": "学生答案正确，但未展示解题过程，未获得方法分。",
+      "rubric": {
+        "correctness": 1,
+        "method": 0,
+        "representation": 1,
+        "communication": 1
+      },
+      "tags": [
+        "过程缺失"
+      ]
+    },
+    {
+      "id": "INT-01",
+      "question": "Find the integral of f(x) = 3x^2 + 4x - 1 with respect to x.",
+      "student_answer": "∫(3x^2 + 4x - 1)dx = x^3 + 2x^2 - x + C...",
+      "gold_score": 4,
+      "agent_score": 4,
+      "max_marks": 4,
+      "error": 0,
+      "abs_error": 0,
+      "verdict": "完全正确，得满分。",
+      "rubric": {
+        "correctness": 1,
+        "method": 1,
+        "representation": 1,
+        "communication": 1
+      },
+      "tags": []
+    },
+    {
+      "id": "INT-02",
+      "question": "Find the integral of f(x) = 3x^2 + 4x - 1 with respect to x.",
+      "student_answer": "x^3 + 2x^2 - x...",
+      "gold_score": 3,
+      "agent_score": 3,
+      "max_marks": 4,
+      "error": 0,
+      "abs_error": 0,
+      "verdict": "部分正确，缺少积分常数C",
+      "rubric": {
+        "correctness": 0.75,
+        "method": 1,
+        "representation": 1,
+        "communication": 1
+      },
+      "tags": [
+        "不定积分与定积分混淆"
+      ]
+    },
+    {
+      "id": "INT-03",
+      "question": "Find the integral of f(x) = 3x^2 + 4x - 1 with respect to x.",
+      "student_answer": "= 3x^3 + 4x^2 - x...",
+      "gold_score": 0,
+      "agent_score": 1,
+      "max_marks": 4,
+      "error": -1,
+      "abs_error": 1,
+      "verdict": "学生正确积分了常数项 -1，得到 -x，获得1分。但积分 3x^2 和 4x 时未除以新的幂次，导致结果错误，且缺少积分常数 +C。",
+      "rubric": {
+        "correctness": 0.25,
+        "method": 0.5,
+        "representation": 0.5,
+        "communication": 1.0
+      },
+      "tags": [
+        "幂法则误用：积分时未将系数除以新指数",
+        "忘记积分常数"
+      ]
+    },
+    {
+      "id": "DIF-01",
+      "question": "Differentiate y = (2x + 1)^5 with respect to x.",
+      "student_answer": "dy/dx = 5(2x+1)^4 × 2 = 10(2x+1)^4...",
+      "gold_score": 3,
+      "agent_score": 3,
+      "max_marks": 3,
+      "error": 0,
+      "abs_error": 0,
+      "verdict": "完全正确",
+      "rubric": {
+        "correctness": 1,
+        "method": 1,
+        "representation": 1,
+        "communication": 1
+      },
+      "tags": []
+    },
+    {
+      "id": "DIF-02",
+      "question": "Differentiate y = (2x + 1)^5 with respect to x.",
+      "student_answer": "dy/dx = 10(2x+1)^4...",
+      "gold_score": 3,
+      "agent_score": 3,
+      "max_marks": 3,
+      "error": 0,
+      "abs_error": 0,
+      "verdict": "正确",
+      "rubric": {
+        "correctness": 1,
+        "method": 1,
+        "representation": 1,
+        "communication": 1
+      },
+      "tags": []
+    },
+    {
+      "id": "DIF-03",
+      "question": "Differentiate y = (2x + 1)^5 with respect to x.",
+      "student_answer": "5(2x+1)^4...",
+      "gold_score": 1.5,
+      "agent_score": 0,
+      "max_marks": 3,
+      "error": 1.5,
+      "abs_error": 1.5,
+      "verdict": "答案不正确，未乘以链式法则中的内层导数2",
+      "rubric": {
+        "correctness": 0,
+        "method": 0,
+        "representation": 0,
+        "communication": 0
+      },
+      "tags": [
+        "链式法则应用错误",
+        "复合函数求导忘记内层导数"
+      ]
+    },
+    {
+      "id": "MEC-01",
+      "question": "A particle moves along a straight line. Its velocity v ms^{-1} at time t seconds is given by v = 3t^2 - 4t + 1. Find the acceleration at t = 2.",
+      "student_answer": "a = dv/dt = 6t - 4\nAt t=2: a = 12 - 4 = 8 ms^{-2}...",
+      "gold_score": 2,
+      "agent_score": 2,
+      "max_marks": 2,
+      "error": 0,
+      "abs_error": 0,
+      "verdict": "该学生的回答与评分方案完全一致，方法正确且答案准确，因此获得满分。",
+      "rubric": {
+        "correctness": 1,
+        "method": 1,
+        "representation": 1,
+        "communication": 1
+      },
+      "tags": []
+    },
+    {
+      "id": "MEC-02",
+      "question": "A particle moves along a straight line. Its velocity v ms^{-1} at time t seconds is given by v = 3t^2 - 4t + 1. Find the acceleration at t = 2.",
+      "student_answer": "a = 3t^2 - 4t + 1\n= 3(4) - 4(2) + 1 = 12 - 8 + 1 = 5 ms^{-2}...",
+      "gold_score": 0,
+      "agent_score": 0,
+      "max_marks": 2,
+      "error": 0,
+      "abs_error": 0,
+      "verdict": "错误",
+      "rubric": {
+        "correctness": 0,
+        "method": 0,
+        "representation": 0,
+        "communication": 0
+      },
+      "tags": [
+        "混淆速度和加速度概念"
+      ]
+    },
+    {
+      "id": "MEC-03",
+      "question": "A particle moves along a straight line. Its velocity v ms^{-1} at time t seconds is given by v = 3t^2 - 4t + 1. Find the acceleration at t = 2.",
+      "student_answer": "a = 6t - 4 = 8...",
+      "gold_score": 1.5,
+      "agent_score": 2,
+      "max_marks": 2,
+      "error": -0.5,
+      "abs_error": 0.5,
+      "verdict": "Correct",
+      "rubric": {
+        "correctness": 1,
+        "method": 1,
+        "representation": 0,
+        "communication": 1
+      },
+      "tags": []
+    }
+  ],
+  "rubric_means": {
+    "correctness": 0.7,
+    "method": 0.7,
+    "representation": 0.767,
+    "communication": 0.867
+  }
+}

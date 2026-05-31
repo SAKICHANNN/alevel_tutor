@@ -107,8 +107,8 @@ GRADING_JSON_PROMPT = """You are an A-Level examiner. Grade the student's answer
 Output ONLY valid JSON. No markdown, no explanation outside the JSON.
 
 {{
-  "score_awarded": <number>,
-  "score_max": <number>,
+  "score_awarded": <number — total score out of {max_marks} marks>,
+  "score_max": {max_marks},
   "confidence": <0.0-1.0>,
   "verdict": "<one-line summary in Chinese>",
   "rubric": {{
@@ -136,11 +136,17 @@ Student answer: {student_answer}
 """
 
 
-def grading_prompt(question: str, mark_scheme: str, student_answer: str) -> str:
+def grading_prompt(question: str, mark_scheme: str, student_answer: str, max_marks: int = 0) -> str:
+    """Generate grading prompt. If max_marks=0, try to infer from mark scheme."""
+    if max_marks == 0:
+        import re
+        numbers = re.findall(r'\[(\d+)\]', mark_scheme)
+        max_marks = sum(int(n) for n in numbers) if numbers else 10
     return GRADING_JSON_PROMPT.format(
         question=question,
         mark_scheme=mark_scheme,
         student_answer=student_answer,
+        max_marks=max_marks,
     )
 
 

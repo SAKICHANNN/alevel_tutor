@@ -319,7 +319,7 @@ class FormulaOCREngine:
                         ]}],
                         "temperature": 0.1, "max_tokens": 400,
                     },
-                    timeout=120,
+                    timeout=300,
                 )
                 data = resp.json()
                 tex = data["choices"][0]["message"]["content"].strip()
@@ -391,7 +391,7 @@ class FormulaOCREngine:
                     "temperature": 0.1,
                     "max_tokens": 400,
                 },
-                timeout=120,
+                timeout=300,
             )
             data = resp.json()
             tex = data["choices"][0]["message"]["content"].strip()
@@ -502,7 +502,7 @@ class VisionAnalyzer:
     def available(self) -> bool:
         return bool(self.config and self.config.api_key)
 
-    def _call_vision(self, image_data: bytes, prompt: str, max_tokens: int = 1024) -> str:
+    def _call_vision(self, image_data: bytes, prompt: str, max_tokens: int = 1024, timeout: int = 300) -> str:
         if not self.available:
             return ""
 
@@ -523,7 +523,7 @@ class VisionAnalyzer:
                     "temperature": 0.1,
                     "max_tokens": max_tokens,
                 },
-                timeout=120,
+                timeout=300,
             )
             data = resp.json()
             return data["choices"][0]["message"]["content"]
@@ -850,3 +850,65 @@ def analyze_image_file(image_path: str, subject_code: str = "") -> dict:
         max_tokens=1200,
     )
     return {"path": image_path, "subject": subject_code, "description": desc}
+
+
+def extract_cross_page(pdf_path: str, subject_code: str, start_page: int, end_page: int) -> dict:
+    """Extract and analyze CONSECUTIVE pages together as one context.
+    
+    Sends multiple page images to Qwen VLM in one call for cross-page understanding.
+    Essential for questions that span pages (e.g. graph on page N, values on page N+1).
+    """
+    import fitz, base64
+    from agent.config import get_active_vision_model
+
+    doc = fitz.open(pdf_path)
+    config = get_active_vision_model()
+    if not config or not config.api_key:
+        doc.close()
+        return {"error": "VLM not available"}
+
+    # Render all pages as images
+    content_parts = []
+    for pg in range(start_page, min(end_page + 1, len(doc))):
+        pix = doc[pg].get_pixmap(dpi=200)
+        img_b64 = base64.b64encode(pix.tobytes("png")).decode()
+        content_parts.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{img_b64}"},
+        })
+
+    prompt_content = [
+        {"type": "text", "text": (
+            f"Analyze these {len(content_parts)} consecutive pages from Cambridge A-Level {subject_code}. "
+            "These pages form one continuous context (e.g. question + diagram + data may span pages). "
+            "For EACH page: extract ALL diagrams, graphs, charts, chemical structures, tables, and images. "
+            "Identify any content that SPANS across pages (e.g. a graph on one page with its data on the next). "
+            "Extract formulas as LaTeX, tables as markdown. Return a unified analysis."
+        )}
+    ]
+    prompt_content.extend(content_parts)
+
+    try:
+        resp = requests.post(
+            f"{config.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {config.api_key}", "Content-Type": "application/json"},
+            json={
+                "model": config.model,
+                "messages": [{"role": "user", "content": prompt_content}],
+                "temperature": 0.1,
+                "max_tokens": 1500,
+            },
+            timeout=300,
+        )
+        data = resp.json()
+        analysis = data["choices"][0]["message"]["content"]
+    except Exception as e:
+        analysis = f"Cross-page analysis failed: {e}"
+
+    doc.close()
+    return {
+        "pages": f"{start_page+1}-{end_page+1}",
+        "subject": subject_code,
+        "page_count": len(content_parts),
+        "analysis": analysis,
+    }

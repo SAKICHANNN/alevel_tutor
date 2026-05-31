@@ -62,8 +62,8 @@ def _get_embedding_fn():
             models = [m["name"] for m in _resp.json().get("models", [])]
             embedding_models = [m for m in models if "embed" in m.lower()]
             if embedding_models:
-                # Prefer 4b for quality (2560d, 0.5s/query, 82% better semantic gap vs 0.6b)
-                # Fall back to 0.6b if 4b not available
+                # Use 4b for quality (2560d, 0.5s/query — same speed as 0.6b, 82% better semantics)
+                # Indexing is offline — student only pays query cost which is 0.5s for both
                 preferred = [m for m in embedding_models if '4b' in m]
                 model = preferred[0] if preferred else embedding_models[0]
                 console.print(f"[dim]Ollama ({len(embedding_models)} found, using {model})[/dim]")

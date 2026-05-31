@@ -773,8 +773,9 @@ def extract_images_from_pdf(pdf_path: str, subject_code: str, page_range: tuple 
                          'candidate number', 'blank page', 'data booklet', 'formula sheet']
         is_cover = any(kw in text_lower for kw in cover_keywords)
         is_blank = text_len < 50 and n_visual == 0
-        is_many_layout_vectors = len(drawings) > 50 and text_len < 1500  # layout boxes, not diagrams
-        if is_cover or is_blank or is_many_layout_vectors:
+        # Only skip if it's actually a cover page with many layout vectors
+        is_cover_with_vectors = is_cover and len(drawings) > 50
+        if is_cover_with_vectors or is_blank:
             continue
         
         # Skip text-only pages

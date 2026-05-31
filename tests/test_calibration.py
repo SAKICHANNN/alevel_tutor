@@ -165,17 +165,245 @@ CALIBRATION_CASES = [
     },
 ]
 
+# ── W5.8: Chemistry (9701) ──
 
-def run_calibration() -> dict:
+CHEMISTRY_CASES = [
+    {
+        "id": "CH-01", "subject": "9701",
+        "question": "State Le Chatelier's principle and explain what happens to the equilibrium position of N2 + 3H2 ⇌ 2NH3 (ΔH = -92 kJ/mol) when the temperature is increased.",
+        "mark_scheme": "Le Chatelier's principle: if a system at equilibrium is subjected to a change, the position of equilibrium shifts to oppose the change [1]. Since forward reaction is exothermic (ΔH < 0), increasing temperature shifts equilibrium to the left (endothermic direction) to absorb heat [1].",
+        "student_answer": "Le Chatelier's principle says the equilibrium shifts to oppose changes. Increasing temperature favours the endothermic reaction. Since the forward reaction is exothermic, equilibrium shifts left, producing less NH3.",
+        "gold_score": 2, "gold_max": 2,
+    },
+    {
+        "id": "CH-02", "subject": "9701",
+        "question": "State Le Chatelier's principle and explain what happens to the equilibrium position of N2 + 3H2 ⇌ 2NH3 (ΔH = -92 kJ/mol) when the temperature is increased.",
+        "mark_scheme": "Le Chatelier's principle: if a system at equilibrium is subjected to a change, the position of equilibrium shifts to oppose the change [1]. Since forward reaction is exothermic (ΔH < 0), increasing temperature shifts equilibrium to the left (endothermic direction) to absorb heat [1].",
+        "student_answer": "Le Chatelier's principle is about equilibrium shifting. Higher temperature means more NH3 because reactions go faster.",
+        "gold_score": 0, "gold_max": 2,
+    },
+    {
+        "id": "CH-03", "subject": "9701",
+        "question": "Calculate the number of moles in 4.0 g of NaOH. (Na = 23, O = 16, H = 1)",
+        "mark_scheme": "Mr(NaOH) = 23 + 16 + 1 = 40 g/mol [1]. n = m/Mr = 4.0/40 = 0.10 mol [1].",
+        "student_answer": "Mr = 23 + 16 + 1 = 40\nn = 4.0 ÷ 40 = 0.1 mol",
+        "gold_score": 2, "gold_max": 2,
+    },
+    {
+        "id": "CH-04", "subject": "9701",
+        "question": "Calculate the number of moles in 4.0 g of NaOH. (Na = 23, O = 16, H = 1)",
+        "mark_scheme": "Mr(NaOH) = 23 + 16 + 1 = 40 g/mol [1]. n = m/Mr = 4.0/40 = 0.10 mol [1].",
+        "student_answer": "4.0 / 40 = 0.1 mol",
+        "gold_score": 1, "gold_max": 2,
+    },
+    {
+        "id": "CH-05", "subject": "9701",
+        "question": "Draw the displayed formula of ethene (C2H4) and state the type of bond between the carbon atoms.",
+        "mark_scheme": "H2C=CH2 with correct double bond shown [1]. The bond is a double bond / σ + π bond [1].",
+        "student_answer": "H H\n \\ /\n  C=C\n / \\\nH H\n\nIt's a double covalent bond.",
+        "gold_score": 2, "gold_max": 2,
+    },
+    {
+        "id": "CH-06", "subject": "9701",
+        "question": "Explain why the first ionisation energy of magnesium (738 kJ/mol) is higher than that of sodium (496 kJ/mol).",
+        "mark_scheme": "Mg has a greater nuclear charge (12 protons vs 11) [1]. Both have electrons removed from the 3s subshell, but Mg's smaller atomic radius / greater nuclear attraction makes the electron harder to remove [1].",
+        "student_answer": "Magnesium has more protons than sodium, so the nuclear charge is greater. This means the outer electron is held more strongly and needs more energy to remove.",
+        "gold_score": 2, "gold_max": 2,
+    },
+    {
+        "id": "CH-07", "subject": "9701",
+        "question": "Explain why the first ionisation energy of magnesium (738 kJ/mol) is higher than that of sodium (496 kJ/mol).",
+        "mark_scheme": "Mg has a greater nuclear charge (12 protons vs 11) [1]. Both have electrons removed from the 3s subshell, but Mg's smaller atomic radius / greater nuclear attraction makes the electron harder to remove [1].",
+        "student_answer": "Mg is heavier than Na so it has higher ionisation energy.",
+        "gold_score": 0, "gold_max": 2,
+    },
+    {
+        "id": "CH-08", "subject": "9701",
+        "question": "In a titration, 25.0 cm³ of HCl of unknown concentration required 20.0 cm³ of 0.100 mol/dm³ NaOH for neutralisation. Calculate the concentration of HCl.",
+        "mark_scheme": "HCl + NaOH → NaCl + H2O (1:1 ratio) [1]. n(NaOH) = 0.100 × 20.0/1000 = 0.00200 mol [1]. n(HCl) = n(NaOH) = 0.00200 mol [1]. c(HCl) = 0.00200 / (25.0/1000) = 0.0800 mol/dm³ [1].",
+        "student_answer": "n(NaOH) = 0.100 × 0.020 = 0.002 mol\nSince 1:1, n(HCl) = 0.002 mol\nc(HCl) = 0.002 / 0.025 = 0.08 mol/dm³",
+        "gold_score": 4, "gold_max": 4,
+    },
+    {
+        "id": "CH-09", "subject": "9701",
+        "question": "In a titration, 25.0 cm³ of HCl of unknown concentration required 20.0 cm³ of 0.100 mol/dm³ NaOH for neutralisation. Calculate the concentration of HCl.",
+        "mark_scheme": "HCl + NaOH → NaCl + H2O (1:1 ratio) [1]. n(NaOH) = 0.100 × 20.0/1000 = 0.00200 mol [1]. n(HCl) = n(NaOH) = 0.00200 mol [1]. c(HCl) = 0.00200 / (25.0/1000) = 0.0800 mol/dm³ [1].",
+        "student_answer": "20 × 0.1 = 2\n2 / 25 = 0.08 M",
+        "gold_score": 1, "gold_max": 4,
+    },
+    {
+        "id": "CH-10", "subject": "9701",
+        "question": "Identify the functional group in CH3COOH and name the homologous series it belongs to.",
+        "mark_scheme": "Functional group: carboxyl / -COOH [1]. Homologous series: carboxylic acids [1].",
+        "student_answer": "Functional group: COOH (carboxyl group)\nHomologous series: carboxylic acids",
+        "gold_score": 2, "gold_max": 2,
+    },
+]
+
+# ── W5.8: Physics (9702) ──
+
+PHYSICS_CASES = [
+    {
+        "id": "PH-01", "subject": "9702",
+        "question": "A car accelerates from rest to 20 m/s in 5 seconds. Calculate the acceleration.",
+        "mark_scheme": "a = (v - u) / t = (20 - 0) / 5 [1] = 4 m/s² [1].",
+        "student_answer": "a = v / t = 20 / 5 = 4 m/s²",
+        "gold_score": 2, "gold_max": 2,
+    },
+    {
+        "id": "PH-02", "subject": "9702",
+        "question": "A car accelerates from rest to 20 m/s in 5 seconds. Calculate the acceleration.",
+        "mark_scheme": "a = (v - u) / t = (20 - 0) / 5 [1] = 4 m/s² [1].",
+        "student_answer": "a = 20 × 5 = 100 m/s²",
+        "gold_score": 0, "gold_max": 2,
+    },
+    {
+        "id": "PH-03", "subject": "9702",
+        "question": "State Ohm's law and calculate the current through a 10 Ω resistor connected to a 5 V battery.",
+        "mark_scheme": "Ohm's law: V = IR (current is proportional to voltage at constant temperature) [1]. I = V/R = 5/10 = 0.5 A [1].",
+        "student_answer": "Ohm's law: V = IR\nI = 5 / 10 = 0.5 A",
+        "gold_score": 2, "gold_max": 2,
+    },
+    {
+        "id": "PH-04", "subject": "9702",
+        "question": "State Ohm's law and calculate the current through a 10 Ω resistor connected to a 5 V battery.",
+        "mark_scheme": "Ohm's law: V = IR (current is proportional to voltage at constant temperature) [1]. I = V/R = 5/10 = 0.5 A [1].",
+        "student_answer": "I = 5/10 = 0.5 A",
+        "gold_score": 1, "gold_max": 2,
+    },
+    {
+        "id": "PH-05", "subject": "9702",
+        "question": "A wave has a frequency of 50 Hz and a wavelength of 6.8 m. Calculate its speed.",
+        "mark_scheme": "v = fλ = 50 × 6.8 [1] = 340 m/s [1].",
+        "student_answer": "v = 50 × 6.8 = 340 m/s",
+        "gold_score": 2, "gold_max": 2,
+    },
+    {
+        "id": "PH-06", "subject": "9702",
+        "question": "A wave has a frequency of 50 Hz and a wavelength of 6.8 m. Calculate its speed.",
+        "mark_scheme": "v = fλ = 50 × 6.8 [1] = 340 m/s [1].",
+        "student_answer": "The speed is 340 m/s.",
+        "gold_score": 0.5, "gold_max": 2,
+    },
+    {
+        "id": "PH-07", "subject": "9702",
+        "question": "Define the moment of a force and calculate the moment when a 10 N force is applied perpendicularly at a distance of 0.5 m from a pivot.",
+        "mark_scheme": "Moment = force × perpendicular distance from pivot [1]. Moment = 10 × 0.5 = 5 Nm [1].",
+        "student_answer": "Moment = F × d = 10 × 0.5 = 5 Nm",
+        "gold_score": 2, "gold_max": 2,
+    },
+    {
+        "id": "PH-08", "subject": "9702",
+        "question": "Define the moment of a force and calculate the moment when a 10 N force is applied perpendicularly at a distance of 0.5 m from a pivot.",
+        "mark_scheme": "Moment = force × perpendicular distance from pivot [1]. Moment = 10 × 0.5 = 5 Nm [1].",
+        "student_answer": "5",
+        "gold_score": 0.5, "gold_max": 2,
+    },
+    {
+        "id": "PH-09", "subject": "9702",
+        "question": "Calculate the kinetic energy of a 2 kg mass moving at 3 m/s.",
+        "mark_scheme": "KE = 1/2 mv² = 1/2 × 2 × 3² [1] = 1/2 × 2 × 9 = 9 J [1].",
+        "student_answer": "KE = 1/2 × 2 × 9 = 9 J",
+        "gold_score": 2, "gold_max": 2,
+    },
+    {
+        "id": "PH-10", "subject": "9702",
+        "question": "Calculate the kinetic energy of a 2 kg mass moving at 3 m/s.",
+        "mark_scheme": "KE = 1/2 mv² = 1/2 × 2 × 3² [1] = 1/2 × 2 × 9 = 9 J [1].",
+        "student_answer": "KE = 2 × 9 = 18 J",
+        "gold_score": 0, "gold_max": 2,
+    },
+]
+
+# ── W5.8: Economics (9708) ──
+
+ECONOMICS_CASES = [
+    {
+        "id": "EC-01", "subject": "9708",
+        "question": "Define price elasticity of demand (PED) and state the formula.",
+        "mark_scheme": "PED measures the responsiveness of quantity demanded to a change in price [1]. Formula: PED = % change in quantity demanded / % change in price [1].",
+        "student_answer": "PED measures how much demand changes when price changes.\nPED = %ΔQD / %ΔP",
+        "gold_score": 2, "gold_max": 2,
+    },
+    {
+        "id": "EC-02", "subject": "9708",
+        "question": "Define price elasticity of demand (PED) and state the formula.",
+        "mark_scheme": "PED measures the responsiveness of quantity demanded to a change in price [1]. Formula: PED = % change in quantity demanded / % change in price [1].",
+        "student_answer": "PED = % change in demand / % change in price",
+        "gold_score": 1, "gold_max": 2,
+    },
+    {
+        "id": "EC-03", "subject": "9708",
+        "question": "Explain the difference between a movement along the demand curve and a shift of the demand curve.",
+        "mark_scheme": "A movement along the demand curve is caused by a change in price of the good itself [1]. A shift of the demand curve is caused by changes in other factors (income, tastes, prices of related goods, etc.) [1].",
+        "student_answer": "Movement along: caused by price change of the good.\nShift: caused by changes in other factors like income, preferences, or related goods.",
+        "gold_score": 2, "gold_max": 2,
+    },
+    {
+        "id": "EC-04", "subject": "9708",
+        "question": "Explain the difference between a movement along the demand curve and a shift of the demand curve.",
+        "mark_scheme": "A movement along the demand curve is caused by a change in price of the good itself [1]. A shift of the demand curve is caused by changes in other factors (income, tastes, prices of related goods, etc.) [1].",
+        "student_answer": "Movement is when price changes. Shift is when the curve moves.",
+        "gold_score": 1, "gold_max": 2,
+    },
+    {
+        "id": "EC-05", "subject": "9708",
+        "question": "Define inflation and state one cause of cost-push inflation.",
+        "mark_scheme": "Inflation is a sustained increase in the general price level [1]. Cost-push inflation is caused by rising costs of production (e.g., higher wages, raw material prices, energy costs) [1].",
+        "student_answer": "Inflation is when prices keep going up over time. Cost-push inflation happens when production costs rise, like when oil prices increase.",
+        "gold_score": 2, "gold_max": 2,
+    },
+    {
+        "id": "EC-06", "subject": "9708",
+        "question": "Define inflation and state one cause of cost-push inflation.",
+        "mark_scheme": "Inflation is a sustained increase in the general price level [1]. Cost-push inflation is caused by rising costs of production (e.g., higher wages, raw material prices, energy costs) [1].",
+        "student_answer": "Inflation = prices going up. Caused by printing too much money.",
+        "gold_score": 0.5, "gold_max": 2,
+    },
+    {
+        "id": "EC-07", "subject": "9708",
+        "question": "Explain how interest rate changes affect aggregate demand through the monetary transmission mechanism.",
+        "mark_scheme": "Lower interest rates reduce the cost of borrowing [1], encouraging consumption and investment [1]. This increases aggregate demand (AD shifts right) [1].",
+        "student_answer": "When interest rates go down, borrowing becomes cheaper. People and firms borrow more and spend more, which increases AD.",
+        "gold_score": 3, "gold_max": 3,
+    },
+    {
+        "id": "EC-08", "subject": "9708",
+        "question": "Explain how interest rate changes affect aggregate demand through the monetary transmission mechanism.",
+        "mark_scheme": "Lower interest rates reduce the cost of borrowing [1], encouraging consumption and investment [1]. This increases aggregate demand (AD shifts right) [1].",
+        "student_answer": "Lower rates = more spending = higher AD.",
+        "gold_score": 1, "gold_max": 3,
+    },
+    {
+        "id": "EC-09", "subject": "9708",
+        "question": "Using a diagram, explain the effect of a subsidy on a market. State the impact on consumer and producer surplus.",
+        "mark_scheme": "A subsidy shifts the supply curve to the right / downwards by the amount of the subsidy [1]. Equilibrium quantity increases, price paid by consumers decreases, price received by producers increases [1]. Both consumer and producer surplus increase [1].",
+        "student_answer": "A subsidy shifts supply right, lowering consumer price and increasing producer revenue. Both surpluses increase.",
+        "gold_score": 3, "gold_max": 3,
+    },
+    {
+        "id": "EC-10", "subject": "9708",
+        "question": "Using a diagram, explain the effect of a subsidy on a market. State the impact on consumer and producer surplus.",
+        "mark_scheme": "A subsidy shifts the supply curve to the right / downwards by the amount of the subsidy [1]. Equilibrium quantity increases, price paid by consumers decreases, price received by producers increases [1]. Both consumer and producer surplus increase [1].",
+        "student_answer": "Subsidy = supply moves right. Consumers pay less.",
+        "gold_score": 1, "gold_max": 3,
+    },
+]
+
+ALL_CASES = CALIBRATION_CASES + CHEMISTRY_CASES + PHYSICS_CASES + ECONOMICS_CASES
     """Run all calibration cases and compute metrics."""
     agent = Agent(conv_id=create_conversation(title="Calibration Run"))
     results = []
 
-    for case in CALIBRATION_CASES:
+    for case in cases if cases else ALL_CASES:
         try:
+            subj = case.get("subject", "9709")
+            if subj and subj != agent.current_subject:
+                agent.set_subject(subj)
+
             grading = agent.grade(
                 question=case["question"],
-                mark_scheme=case["mark_scheme"],
+                mark_scheme=case.get("mark_scheme", "auto"),
                 student_answer=case["student_answer"],
             )
             agent_score = grading.get("score_awarded", 0)
@@ -251,23 +479,36 @@ def run_calibration() -> dict:
 
 
 if __name__ == "__main__":
-    print("Running Grading Calibration (15 cases)...")
-    print("-" * 60)
-    report = run_calibration()
-    print("-" * 60)
-    print(f"\nResults:")
-    print(f"  Cases: {report['n_cases']}")
-    print(f"  MAE:   {report['mae']:.3f} marks (needs < 0.5 → {'PASS' if report['pass_mae'] else 'FAIL'})")
-    print(f"  r:     {report['pearson_r']:.3f} (needs > 0.85 → {'PASS' if report['pass_correlation'] else 'FAIL'})")
-    print(f"  Rubric means: {report['rubric_means']}")
+    subjects = {
+        "9709 Math": CALIBRATION_CASES,
+        "9701 Chemistry": CHEMISTRY_CASES,
+        "9702 Physics": PHYSICS_CASES,
+        "9708 Economics": ECONOMICS_CASES,
+    }
+    all_reports = {}
 
-    # Save report
+    for label, cases in subjects.items():
+        print(f"\nRunning {label} Calibration ({len(cases)} cases)...")
+        print("-" * 60)
+        report = run_calibration(cases, label=label)
+        print(f"  MAE: {report['mae']:.3f} | r: {report['pearson_r']:.3f} | "
+              f"MAE pass: {report['pass_mae']} | r pass: {report['pass_correlation']}")
+        all_reports[label] = report
+
+    # Overall
+    print(f"\n{'='*60}")
+    print("Overall Summary")
+    print(f"{'='*60}")
+    all_pass = True
+    for label, r in all_reports.items():
+        ok = "✅" if r['pass_mae'] and r['pass_correlation'] else "❌"
+        print(f"  {ok} {label}: MAE={r['mae']:.3f}, r={r['pearson_r']:.3f}")
+        if not (r['pass_mae'] and r['pass_correlation']):
+            all_pass = False
+
+    print(f"\nOverall: {'ALL PASS' if all_pass else 'SOME FAIL'}")
+
     out_path = EVAL_DIR / "calibration_report.json"
     with open(out_path, "w") as f:
-        json.dump(report, f, indent=2, ensure_ascii=False)
+        json.dump(all_reports, f, indent=2, ensure_ascii=False)
     print(f"\nReport saved to: {out_path}")
-
-    if report["pass_mae"] and report["pass_correlation"]:
-        print("\nCALIBRATION PASSED")
-    else:
-        print("\nCALIBRATION NEEDS IMPROVEMENT")

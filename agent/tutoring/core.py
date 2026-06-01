@@ -30,6 +30,28 @@ from agent.security import detect_injection, validate_tool_call, sanitize_retrie
 
 console = Console()
 
+# ── W5: Output sanitizer — detect self-correction artifacts ──
+
+_SELF_CORRECTION_PATTERNS = [
+    r'(?:❌|不对|等等|重新算|实际上|查到了).*?(?:不对|重新|纠正)',
+    r'等等.*?重新.*?算',
+]
+
+def _sanitize_output(content: str) -> str:
+    """Post-process LLM output to flag self-correction artifacts.
+    If detected, prepend a warning for the student."""
+    import re
+    for pattern in _SELF_CORRECTION_PATTERNS:
+        if re.search(pattern, content, re.IGNORECASE):
+            # Mark the output so the student knows to verify
+            if "⚠️" not in content[:200]:
+                content = (
+                    "⚠️ 此回答可能包含自我修正过程，部分信息请以教材为准。\n"
+                    "如有疑问，请追问确认。\n\n" + content
+                )
+            break
+    return content
+
 # ── Tool Definitions for function calling ──
 
 TOOLS = [
@@ -436,6 +458,8 @@ class Agent:
                 break
 
         final_content = msg.get("content", "")
+        # W5: Sanitize output — remove self-correction artifacts
+        final_content = _sanitize_output(final_content)
         self.conversation.append({"role": "assistant", "content": final_content})
         if self.conv_id:
             save_message(self.conv_id, "assistant", final_content)

@@ -398,7 +398,7 @@ def build_ui():
                 )
 
                 retrieval_slider = gr.Slider(
-                    minimum=1, maximum=20, value=3, step=1,
+                    minimum=1, maximum=100, value=3, step=1,
                     label="📊 检索结果数",
                     info="每次搜索返回给 LLM 的条数",
                     interactive=True,

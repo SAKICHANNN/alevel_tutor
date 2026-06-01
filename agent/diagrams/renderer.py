@@ -182,94 +182,28 @@ def render_graphviz(code: str) -> Optional[str]:
     return None
 
 
-def render_diagram(code: str, engine: str = "mermaid",
-                   template: str = "general") -> Optional[str]:
-    """Unified render entry point. Returns base64 data URI or None."""
-    if engine == "mermaid":
-        return render_mermaid(code)
-    elif engine == "tikz":
-        return render_tikz(code, template)
-    elif engine in ("vegalite", "vega-lite"):
-        return render_vegalite(code)
-    elif engine == "graphviz":
-        return render_graphviz(code)
-    return None
-
-
-def extract_and_render_mermaid(content: str) -> str:
-    """Find ```mermaid blocks in text and replace with rendered SVG images."""
-    pattern = re.compile(r'```mermaid\s*\n(.*?)```', re.DOTALL)
-
-    def _replace(match):
-        code = match.group(1).strip()
-        uri = render_mermaid(code)
-        if uri:
-            return f'\n\n![diagram]({uri})\n\n'
-        return match.group(0)
-
-    return pattern.sub(_replace, content)
-
-
-def extract_and_render_tikz(content: str) -> str:
-    """Find ```tikz blocks in text and replace with rendered SVG images."""
-    pattern = re.compile(r'```tikz(?:\s+template=(\w+))?\s*\n(.*?)```', re.DOTALL)
-
-    def _replace(match):
-        template = match.group(1) or "general"
-        code = match.group(2).strip()
-        uri = render_tikz(code, template)
-        if uri:
-            return f'\n\n![diagram]({uri})\n\n'
-        return match.group(0)
-
-    return pattern.sub(_replace, content)
-
-
-def extract_and_render_vegalite(content: str) -> str:
-    """Find ```vegalite / ```vega-lite blocks and replace with rendered SVG."""
-    pattern = re.compile(r'```(?:vegalite|vega-lite)\s*\n(.*?)```', re.DOTALL)
-
-    def _replace(match):
-        code = match.group(1).strip()
-        uri = render_vegalite(code)
-        if uri:
-            return f'\n\n![diagram]({uri})\n\n'
-        return match.group(0)
-
-    return pattern.sub(_replace, content)
-
-
-def extract_and_render_plot(content: str) -> str:
-    """Find ```plot blocks — if {type, ...} → build via spec_builder; else raw spec."""
-    pattern = re.compile(r'```plot\s*\n(.*?)```', re.DOTALL)
-
-    def _replace(match):
-        try:
-            params = json.loads(match.group(1).strip())
-            # If has "type" key, use spec builder for correct math
-            if isinstance(params, dict) and "type" in params and "curves" not in params:
-                from agent.diagrams.spec_builder import build_spec
-                spec = build_spec(params)
-                if spec is None:
-                    return match.group(0)
-            else:
-                spec = params  # Raw spec (backward compat)
-
-            from agent.diagrams.plotter import render_economics
-            uri = render_economics(spec)
-            if uri:
-                return f'\n\n![diagram]({uri})\n\n'
-        except (json.JSONDecodeError, Exception):
-            pass
-        return match.group(0)
-
-    return pattern.sub(_replace, content)
-
-
 def render_all_diagrams(content: str) -> str:
-    """Post-process LLM output: render all diagram code blocks to images."""
-    content = extract_and_render_plot(content)
-    content = extract_and_render_mermaid(content)
-    content = extract_and_render_tikz(content)
-    content = extract_and_render_vegalite(content)
+    """Master post-processor: extract + render all diagram code blocks."""
+    errors = 0
+    try:
+        content = extract_and_render_plot(content)
+    except Exception:
+        errors += 1
+    try:
+        content = extract_and_render_mermaid(content)
+    except Exception:
+        errors += 1
+    try:
+        content = extract_and_render_tikz(content)
+    except Exception:
+        errors += 1
+    try:
+        content = extract_and_render_vegalite(content)
+    except Exception:
+        errors += 1
+
+    if errors > 0:
+        import sys
+        print(f"[diagrams] {errors} renderer(s) failed silently", file=sys.stderr, flush=True)
+
     return content

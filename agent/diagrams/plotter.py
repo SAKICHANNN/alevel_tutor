@@ -165,9 +165,9 @@ def _plot(spec: dict):
                 x_scatter=sx,
                 y_scatter=sy,
                 draw_lines=False,
-                margin=0.03,
-                min_distance=0.025,
-                max_distance=0.1,
+                margin=0.02,
+                min_distance=0.015,
+                max_distance=0.06,
             )
             # Bold-ify the allocated texts and set per-label color
             for i, t in enumerate(texts):

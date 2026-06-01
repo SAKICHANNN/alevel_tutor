@@ -68,6 +68,7 @@ MODELS = {
         base_url=DEEPSEEK_BASE_URL,
         temperature=0.7,
         max_tokens=4096,
+        thinking=True,  # W5: Enable thinking for higher quality tutoring
     ),
     "reasoner": LLMConfig(
         provider="deepseek",

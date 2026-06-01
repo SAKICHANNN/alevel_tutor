@@ -20,6 +20,8 @@ __pycache__/
 build/
 data/chroma_db/
 data/chroma_db/*.sqlite3
+data/gui_debug.log
+data/rendered/
 data/tutor.db
 data/tutor.db-shm
 data/tutor.db-wal

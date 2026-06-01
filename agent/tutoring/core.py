@@ -39,8 +39,90 @@ _SELF_CORRECTION_PATTERNS = [
 
 _ASCII_ART_PATTERN = re.compile(r'[┌┐└┘├┤│─┬┴┼╭╮╰╯→←↑↓●○]')
 
+# ── W6: KaTeX compatibility fixer ──
+# Gradio renders $...$ and $$...$$ as KaTeX. LLMs often use $ for currency,
+# which creates unpaired $ delimiters and causes KaTeX parse errors.
 
-_ASCII_ART_PATTERN = re.compile(r'[┌┐└┘├┤│─┬┴┼╭╮╰╯→←↑↓●○]')
+_CURRENCY_DOLLAR_RE = re.compile(r'\$(\d[\d,.]*)(?![\d$])')
+_AMPERSAND_IN_MATH_RE = re.compile(r'(?<!\\)&(?!\s*amp;)')
+_last_katex_fixes: dict = {"currency": 0, "stray_dollar": 0, "ampersand": 0, "ce_command": 0}
+_last_raw_output: str = ""
+_last_tool_calls: list = []
+_last_response_time: float = 0.0
+
+
+def _fix_katex(content: str) -> str:
+    """Fix common patterns that cause KaTeX parse errors in Gradio Chatbot.
+    
+    Returns only the fixed content. Use _fix_katex_with_report() to get details."""
+    return _fix_katex_with_report(content)[0]
+
+
+def _fix_katex_with_report(content: str) -> tuple:
+    """Fix KaTeX patterns and return (fixed_content, fix_report dict)."""
+    fixes = {"currency": 0, "stray_dollar": 0, "ampersand": 0, "ce_command": 0}
+
+    # Pre-pass: fix currency $ before scanning LaTeX blocks
+    currency_matches = _CURRENCY_DOLLAR_RE.findall(content)
+    fixes["currency"] = len(currency_matches)
+    content = _CURRENCY_DOLLAR_RE.sub(r'\1元', content)
+
+    # Scan LaTeX blocks with proper nesting ($$ takes priority over $)
+    latex_blocks = []  # list of (start, end, is_display)
+    i = 0
+    while i < len(content):
+        if content.startswith('$$', i):
+            j = content.find('$$', i + 2)
+            if j != -1:
+                latex_blocks.append((i, j + 2, True))
+                i = j + 2
+            else:
+                i += 2
+        elif content[i] == '$':
+            j = content.find('$', i + 1)
+            if j != -1 and not content.startswith('$$', j):
+                latex_blocks.append((i, j + 1, False))
+                i = j + 1
+            else:
+                i += 1
+        else:
+            i += 1
+
+    if not latex_blocks:
+        before = content
+        content = content.replace('$', '＄')
+        fixes["stray_dollar"] = before.count('$')
+        return content, fixes
+
+    # Build result piece by piece, protecting LaTeX blocks
+    result = []
+    last_end = 0
+    for start, end, is_display in latex_blocks:
+        non_latex = content[last_end:start]
+        stray_count = non_latex.count('$')
+        fixes["stray_dollar"] += stray_count
+        non_latex = non_latex.replace('$', '＄')
+        result.append(non_latex)
+
+        block = content[start:end]
+        before_block = block
+        block = _AMPERSAND_IN_MATH_RE.sub(r'\\text{ and }', block)
+        if block != before_block:
+            fixes["ampersand"] += before_block.count('&')
+        before_block = block
+        block = re.sub(r'\\ce\{([^}]+)\}', r'\\text{\1}', block)
+        if block != before_block:
+            fixes["ce_command"] += 1
+        result.append(block)
+
+        last_end = end
+
+    non_latex = content[last_end:]
+    fixes["stray_dollar"] += non_latex.count('$')
+    non_latex = non_latex.replace('$', '＄')
+    result.append(non_latex)
+
+    return ''.join(result), fixes
 
 
 def _sanitize_output(content: str) -> str:
@@ -48,7 +130,11 @@ def _sanitize_output(content: str) -> str:
     from agent.diagrams.renderer import render_all_diagrams
     content = render_all_diagrams(content)
 
-    import re
+    # W6: Fix KaTeX-breaking patterns — currency $ and & in math mode
+    content, katex_fixes = _fix_katex_with_report(content)
+    _last_katex_fixes.clear()
+    _last_katex_fixes.update(katex_fixes)
+
     for pattern in _SELF_CORRECTION_PATTERNS:
         if re.search(pattern, content, re.IGNORECASE):
             if "⚠️" not in content[:200]:
@@ -383,6 +469,12 @@ class Agent:
 
     def chat(self, user_input: str, image_path: Optional[str] = None) -> str:
         """Process a chat message with optional image."""
+        global _last_raw_output, _last_tool_calls, _last_response_time
+        _last_raw_output = ""
+        _last_tool_calls = []
+        _last_response_time = 0.0
+
+        t_start = time.time()
         # W5: Prompt injection guard — check before processing
         is_injection, reason = detect_injection(user_input)
         if is_injection:
@@ -472,6 +564,12 @@ class Agent:
                         log_error("tool_fail", f"core.py:_execute_tool({tool_name})",
                                   str(e), self.conv_id, self.current_subject)
 
+                    _last_tool_calls.append({
+                        "tool": tool_name,
+                        "args": arguments,
+                        "result_len": len(tool_result) if isinstance(tool_result, str) else 0,
+                    })
+
                     api_messages.append({
                         "role": "tool",
                         "tool_call_id": tool_call["id"],
@@ -496,6 +594,9 @@ class Agent:
         final_content = msg.get("content", "")
         # W5: Save reasoning_content for API continuity (DeepSeek requires it)
         reasoning = msg.get("reasoning_content", "")
+        # Store raw output before sanitization for debug logging
+        _last_raw_output = final_content
+        _last_response_time = time.time() - t_start
         # W5: Sanitize output — remove self-correction artifacts
         final_content = _sanitize_output(final_content)
         assistant_msg = {"role": "assistant", "content": final_content}

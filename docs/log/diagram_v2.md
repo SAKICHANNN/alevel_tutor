@@ -22,3 +22,33 @@
 - 经济图 → ```plot JSON，电路/化学 → ```tikz template=xxx
 - 观察：LLM 仍在用旧 TikZ 格式，但渲染管道已支持 `plot`
 - 下一步：Phase 3 — VLM 验证渲染质量
+
+## Phase 3 — 2026-06-01
+
+### commit 8cf5dcd: Cambridge-standard diagram style
+- 100 DPI → 提升清晰度
+- Bold labels — 坐标轴字体加粗
+- Larger figure size — 增大画布防止文字重叠
+- Cambridge exam style palette: 蓝(D)、红(S)、绿(MSB)……
+
+### commit ce95399: intersection fix plan
+- 文档：LLM 描述意图，Python 计算精确坐标（而非反过来）
+- 根本原因：LLM 不具备生成精确数学坐标的能力（DeTikZify/CAGE 论文验证）
+
+## Phase 4 — 2026-06-01
+
+### commit fa5085c: spec_builder — LLM describes type, Python computes exact math
+- 新增 `agent/diagrams/spec_builder.py`：LLM 只填类型+参数，Python 计算交点/斜率
+- 模式：`{"type": "demand_supply", "elasticity": "elastic"}` → builder 计算完整 spec → plotter 渲染
+- 14 种经济图类型支持
+- 48 项图表测试全部通过，VLM 验证 Grade A on 2/3 类型
+
+### commit 59ab005: shading uses equilibrium labels
+- 填色区域改用 Pe/Qe 标签代替手动 x1/x2 坐标
+- 避免 LLM 猜测网格坐标导致填色错位
+
+### commit 76b4271: PNG → SVG output
+- 输出格式从 base64 PNG (50KB) 切换到 base64 SVG (16KB)，体积 3x 减小
+- **彻底解决中文乱码**：SVG 直接嵌入文字不再依赖 matplotlib 字体系统
+- 新增 LLM 生成 SVG 的系统提示模板（坐标轴、色系、标注规范）
+- 限制每回复最多 2 张图（`prompts.py:18`），避免 8 张图刷屏占用 token

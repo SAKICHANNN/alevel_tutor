@@ -570,17 +570,22 @@ class Agent:
 
         for _ in range(20):
             if msg.get("tool_calls"):
-                # Detect consecutive duplicate — stop if same tool+args twice in a row
+                # Detect consecutive duplicate — filter out repeated tool calls
+                filtered = []
                 for tc in msg["tool_calls"]:
                     tc_key = (tc["function"]["name"], tc["function"]["arguments"])
                     if tc_key == _last_tc_key:
-                        final_content = "⚠️ 检测到重复检索，已停止。请细化你的问题后重新提问。"
-                        assistant_msg = {"role": "assistant", "content": final_content}
-                        self.conversation.append(assistant_msg)
-                        if self.conv_id:
-                            save_message(self.conv_id, "assistant", final_content)
-                        return final_content
+                        continue  # skip duplicate, but keep other valid calls
                     _last_tc_key = tc_key
+                    filtered.append(tc)
+                if not filtered:
+                    final_content = "⚠️ 检测到全部重复检索，已停止。请细化你的问题后重新提问。"
+                    assistant_msg = {"role": "assistant", "content": final_content}
+                    self.conversation.append(assistant_msg)
+                    if self.conv_id:
+                        save_message(self.conv_id, "assistant", final_content)
+                    return final_content
+                msg["tool_calls"] = filtered
                 api_messages.append(msg)
                 if self.conv_id:
                     save_message(self.conv_id, "assistant", msg.get("content", ""),

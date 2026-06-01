@@ -85,25 +85,24 @@ def render_economics(spec: dict) -> Optional[str]:
 
 def _label_offset_above_below(slope: float, x0: float, y0: float, x_max: float, y_max: float):
     """
-    Place label perpendicular to the curve, offset to the 'outside'.
-    Demand (negative slope): offset above-left (text to upper-left of curve)
-    Supply (positive slope): offset below-right (text to lower-right of curve)
+    Place label perpendicular to curve at clear distance.
+    Demand (negative slope): label above the curve
+    Supply (positive slope): label below the curve
     """
-    # Perpendicular unit vector (normal to the line, rotated 90° CCW)
-    # Line direction: (1, slope). Normal: (-slope, 1) / sqrt(slope² + 1)
+    # Perpendicular normal: (-slope, 1) normalized
     mag = np.sqrt(slope**2 + 1)
     nx, ny = -slope / mag, 1 / mag
+    # Clear offset: ~10% of plot size away from the line
+    dist = 0.8 * min(x_max, y_max) / 10
 
-    # For demand (s < 0): normal points up-right, label goes above curve
-    # For supply (s > 0): normal points down-right, label goes below curve
-    # Scale offset to ~5% of plot size
-    offset = 0.3 * min(x_max, y_max) / 10
     if slope < 0:
-        ox = x0 - abs(nx) * offset * 2
-        oy = y0 + ny * offset
+        # Demand: label above-left
+        ox = x0 + nx * dist * 1.5
+        oy = y0 + ny * dist * 1.5
     else:
-        ox = x0 + nx * offset * 2
-        oy = y0 - abs(ny) * offset
+        # Supply: label below-right
+        ox = x0 + nx * dist * 1.5
+        oy = y0 + ny * dist * 1.5
 
     ox = max(0.2, min(x_max - 0.2, ox))
     oy = max(0.2, min(y_max - 0.2, oy))
@@ -164,8 +163,8 @@ def _plot(spec: dict):
 
                     ax.annotate(label, xy=(lx, ly), fontsize=14, fontweight='bold',
                                 color=color, xytext=(ox, oy), textcoords='data',
-                                bbox=dict(boxstyle='round,pad=0.15', facecolor='white',
-                                         edgecolor='none', alpha=0.85),
+                                bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
+                                         edgecolor=color, linewidth=1.0, alpha=1.0),
                                 zorder=6)
 
             drawn[name] = {"type": "line", "i": i_val, "s": s_val}

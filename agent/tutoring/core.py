@@ -53,6 +53,7 @@ _last_model: str = ""
 _last_svg_count: int = 0
 _last_conv_len: int = 0
 _token_limit_enabled: bool = True
+_budget_enabled: bool = True
 
 
 def _fix_katex(content: str) -> str:
@@ -262,10 +263,12 @@ class Agent:
         if not config.api_key:
             raise ValueError(f"No API key configured for {model_key}. Set environment variables.")
 
-        # BudgetGuard check
-        ok, budget_msg = check_budget()
-        if not ok:
-            raise RuntimeError(f"预算限制: {budget_msg}")
+        # BudgetGuard check (skippable via toggle)
+        global _budget_enabled
+        if _budget_enabled:
+            ok, budget_msg = check_budget()
+            if not ok:
+                raise RuntimeError(f"预算限制: {budget_msg}")
 
         headers = {
             "Authorization": f"Bearer {config.api_key}",
@@ -660,3 +663,13 @@ class Agent:
     @staticmethod
     def get_token_limit() -> bool:
         return _token_limit_enabled
+
+    @staticmethod
+    def set_budget(enabled: bool):
+        global _budget_enabled
+        _budget_enabled = enabled
+        return f"Budget {'enabled' if enabled else 'disabled'}"
+
+    @staticmethod
+    def get_budget() -> bool:
+        return _budget_enabled

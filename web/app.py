@@ -36,6 +36,7 @@ from agent.tutoring.core import (
     _last_svg_count,
     _last_conv_len,
     _token_limit_enabled,
+    _budget_enabled,
 )
 from agent.tutoring.prompts import welcome_message
 from agent.config import SUBJECTS, SUBJECT_BY_CODE, PROJECT_ROOT
@@ -280,6 +281,7 @@ def chat_fn(message: str, history: list, session_id: str, subject_code: str):
         "model": _last_model,
         "conv_len": _last_conv_len,
         "token_limit": _token_limit_enabled,
+        "budget": _budget_enabled,
         "user_msg": message[:300],
         "response_len": len(response),
         "svg_count": _last_svg_count,
@@ -386,6 +388,13 @@ def build_ui():
                     interactive=True,
                 )
 
+                budget_toggle = gr.Checkbox(
+                    value=True,
+                    label="💰 预算控制 (¥50/月)",
+                    info="关闭后跳过 API 费用限制",
+                    interactive=True,
+                )
+
                 gr.Markdown("---")
                 cost_html = gr.HTML(value=get_cost_html, every=30)
 
@@ -461,6 +470,12 @@ def build_ui():
                 token_limit_toggle.change(
                     lambda enabled: Agent.set_token_limit(enabled),
                     [token_limit_toggle],
+                    None,
+                )
+
+                budget_toggle.change(
+                    lambda enabled: Agent.set_budget(enabled),
+                    [budget_toggle],
                     None,
                 )
 

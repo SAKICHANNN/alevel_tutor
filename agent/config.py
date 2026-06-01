@@ -67,7 +67,7 @@ MODELS = {
         api_key=DEEPSEEK_API_KEY,
         base_url=DEEPSEEK_BASE_URL,
         temperature=0.7,
-        max_tokens=4096,
+        max_tokens=8192,  # Increased from 4096 for diagram-heavy responses
         thinking=True,  # W5: Enable thinking for higher quality tutoring
     ),
     "reasoner": LLMConfig(

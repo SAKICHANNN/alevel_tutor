@@ -40,8 +40,45 @@ _SELF_CORRECTION_PATTERNS = [
 _ASCII_ART_PATTERN = re.compile(r'[┌┐└┘├┤│─┬┴┼╭╮╰╯→←↑↓●○]')
 
 
+_ASCII_ART_PATTERN = re.compile(r'[┌┐└┘├┤│─┬┴┼╭╮╰╯→←↑↓●○]')
+
+
+def _render_mermaid_blocks(content: str) -> str:
+    """Server-side: convert ```mermaid blocks to SVG images via Kroki API."""
+    import base64
+    import re as _re
+    import requests as _req
+
+    MD_PATTERN = _re.compile(r'```mermaid\s*\n(.*?)```', _re.DOTALL)
+
+    def _replace(match):
+        code = match.group(1).strip()
+        try:
+            resp = _req.post(
+                "https://kroki.io/mermaid/svg",
+                data=code.encode("utf-8"),
+                headers={"Content-Type": "text/plain"},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                svg = resp.text
+                b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+                return f'<img src="data:image/svg+xml;base64,{b64}" ' \
+                       f'style="max-width:100%;margin:12px auto;display:block;" ' \
+                       f'alt="diagram">'
+        except Exception:
+            pass
+        # Fallback: keep original code block
+        return match.group(0)
+
+    return MD_PATTERN.sub(_replace, content)
+
+
 def _sanitize_output(content: str) -> str:
-    """Post-process LLM output: flag self-correction and ASCII art."""
+    """Post-process LLM output: render mermaid, flag self-correction and ASCII art."""
+    # Render mermaid blocks to SVG images (server-side, 0 JS)
+    content = _render_mermaid_blocks(content)
+
     import re
     for pattern in _SELF_CORRECTION_PATTERNS:
         if re.search(pattern, content, re.IGNORECASE):
@@ -52,14 +89,15 @@ def _sanitize_output(content: str) -> str:
                 )
             break
 
-    # Detect ASCII art diagrams (box-drawing characters used as circuit/flow diagrams)
-    ascii_matches = _ASCII_ART_PATTERN.findall(content)
-    if len(ascii_matches) >= 5 and "```mermaid" not in content:
-        content += (
-            "\n\n---\n"
-            "⚠️ **图表提示**：以上包含 ASCII 字符拼图，可能排版错乱。"
-            "请回复「用 Mermaid 重画」让我重新绘制。"
-        )
+    # Detect ASCII art diagrams
+    if "```mermaid" not in content and "data:image/svg" not in content:
+        ascii_matches = _ASCII_ART_PATTERN.findall(content)
+        if len(ascii_matches) >= 5:
+            content += (
+                "\n\n---\n"
+                "⚠️ **图表提示**：以上包含 ASCII 字符拼图，可能排版错乱。"
+                "请回复「用 Mermaid 重画」让我重新绘制。"
+            )
 
     return content
 

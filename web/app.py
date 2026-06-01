@@ -315,36 +315,6 @@ def build_ui():
     """) as demo:
         session_id = gr.State(value=lambda: os.urandom(8).hex())
 
-        # ── Mermaid.js loader (reliable: visible HTML element) ──
-        gr.HTML("""
-        <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-        <script>
-        (function() {
-            if (window.__md) return; window.__md = 1;
-            mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
-            function scan() {
-                document.querySelectorAll('code.language-mermaid').forEach(function(c) {
-                    var p = c.parentElement;
-                    if (p && p.tagName === 'PRE' && !p.dataset.md) {
-                        p.dataset.md = '1';
-                        p.classList.add('mermaid');
-                        p.textContent = c.textContent;
-                        try { mermaid.run({ nodes: [p] }); } catch(e) { console.error(e); }
-                    }
-                });
-            }
-            setInterval(scan, 800);
-            new MutationObserver(scan).observe(document.body, {childList:true, subtree:true, characterData:true});
-        })();
-        </script>
-        <style>
-        pre.mermaid { background:#fafafa; border-radius:8px; padding:12px; text-align:center; }
-        pre.mermaid svg { max-width:100%; height:auto; }
-        .katex-display { overflow-x:auto; }
-        .katex { font-size:1.1em; }
-        </style>
-        """, visible=False)
-
         # ── Header ──
         gr.Markdown(_get_welcome())
 
@@ -378,6 +348,7 @@ def build_ui():
                     type="messages",
                     height=500,
                     show_copy_button=True,
+                    sanitize_html=False,
                     latex_delimiters=[
                         {"left": "$$", "right": "$$", "display": True},
                         {"left": "$", "right": "$", "display": False},

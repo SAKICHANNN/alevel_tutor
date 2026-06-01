@@ -32,6 +32,9 @@ from agent.tutoring.core import (
     _last_raw_output,
     _last_tool_calls,
     _last_response_time,
+    _last_model,
+    _last_svg_count,
+    _last_conv_len,
 )
 from agent.tutoring.prompts import welcome_message
 from agent.config import SUBJECTS, SUBJECT_BY_CODE, PROJECT_ROOT
@@ -273,9 +276,11 @@ def chat_fn(message: str, history: list, session_id: str, subject_code: str):
     _log_debug({
         "session": session_id[:8],
         "subject": subject_code or agent.current_subject,
+        "model": _last_model,
+        "conv_len": _last_conv_len,
         "user_msg": message[:300],
         "response_len": len(response),
-        "has_svg": "data:image/svg" in response,
+        "svg_count": _last_svg_count,
         "raw_len": len(_last_raw_output),
         "katex_fixes": dict(_read_katex_fixes),
         "tool_calls": list(_last_tool_calls),

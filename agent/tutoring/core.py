@@ -30,6 +30,35 @@ from agent.security import detect_injection, validate_tool_call, sanitize_retrie
 
 console = Console()
 
+# ── W5: Auto-inject economic diagram templates ──
+
+ECON_KEYWORD_MAP = [
+    (["monopoly", "market power", "profit max", "price maker"], "econ:monopoly"),
+    (["monopsony", "labour market", "mcl", "acl", "mrp"], "econ:monopsony"),
+    (["externality", "externalities", "dwl", "deadweight loss", "msc", "mpc", "msb", "mpb"], "econ:negative-externality"),
+    (["ad-as", "ad as", "aggregate demand", "aggregate supply", "lras", "sras"], "econ:ad-as"),
+    (["ad shift", "ad increase", "expansionary", "fiscal policy", "multiplier"], "econ:ad-increase"),
+    (["tax incidence", "tax burden", "per unit tax", "specific tax"], "econ:tax-incidence"),
+    (["subsidy", "subsidies", "government grant"], "econ:subsidy"),
+    (["price ceiling", "maximum price", "max price"], "econ:price-ceiling"),
+    (["price floor", "minimum price", "min price", "minimum wage"], "econ:minimum-price"),
+    (["ppf", "ppc", "production possibility", "opportunity cost"], "econ:ppc"),
+    (["tariff", "trade barrier", "protectionism", "import"], "econ:tariff"),
+    (["keynesian", "liquidity trap", "keynes"], "econ:keynesian-lras"),
+    (["demand shift", "supply shift", "shift in demand", "shift in supply"], "econ:demand-shift-right"),
+    (["demand", "supply", "equilibrium", "market equilibrium"], "econ:demand-supply"),
+]
+
+def _inject_econ_template(content: str, user_input: str) -> str:
+    user_lower = user_input.lower()
+    # Skip if already has a template reference
+    if "@diagram" in content or "template=econ:" in content:
+        return content
+    for keywords, template in ECON_KEYWORD_MAP:
+        if any(kw in user_lower for kw in keywords):
+            return content + f"\n\n@diagram({template})\n\n"
+    return content
+
 # ── W5: Output sanitizer — detect self-correction artifacts ──
 
 _SELF_CORRECTION_PATTERNS = [
@@ -495,11 +524,13 @@ class Agent:
                 break
 
         final_content = msg.get("content", "")
-        # W5: Save reasoning_content for API continuity (DeepSeek requires it)
         reasoning = msg.get("reasoning_content", "")
-        # W5: Sanitize output — render diagrams, remove self-correction
+
+        # Auto-inject diagram template BEFORE rendering (checks raw LLM output)
+        final_content = _inject_econ_template(final_content, user_input)
+
         final_content = _sanitize_output(final_content)
-        # Strip inline base64 images from conversation history to save tokens
+
         import re as _re2
         clean_for_history = _re2.sub(
             r'!\[diagram\]\(data:image/[^)]+\)',

@@ -211,44 +211,64 @@ def extract_and_render_mermaid(content: str) -> str:
 
 
 def extract_and_render_tikz(content: str) -> str:
-    """Find ```tikz blocks in text and replace with rendered SVG images.
-    Supports template references: template=econ:demand-supply"""
+    """Find ```tikz blocks or @diagram(ref) references and replace with SVG."""
+    simple_ref = re.compile(r'@diagram\(([\w:-]+)\)')
+    content = simple_ref.sub(_render_simple_ref, content)
     pattern = re.compile(r'```tikz(?:\s+template=([\w:-]+))?\s*\n(.*?)```', re.DOTALL)
+    content = pattern.sub(_replace_tikz_block, content)
+    return content
 
-    def _replace(match):
-        template_ref = match.group(1) or ""
-        code = match.group(2).strip()
 
-        # Check if it's an economics template reference
-        if template_ref.startswith("econ:"):
-            from agent.diagrams.templates.economics import render_template as econ_render, ECON_TEMPLATES
-            tmpl_name = template_ref[5:]
-            tmpl_code = econ_render(tmpl_name)
-            if tmpl_code:
-                uri = render_tikz_full(tmpl_code)
-                if uri:
-                    return f'\n\n![diagram]({uri})\n\n'
-            return match.group(0)
+def _render_simple_ref(match):
+    """Handle @diagram(econ:monopoly) type references."""
+    ref = match.group(1)
+    if ref.startswith("econ:"):
+        from agent.diagrams.templates.economics import render_template as econ_render
+        tmpl_name = ref[5:]
+        tmpl_code = econ_render(tmpl_name)
+        if tmpl_code:
+            uri = render_tikz_full(tmpl_code)
+            if uri:
+                return f'\n\n![diagram]({uri})\n\n'
+    elif ref.startswith("phys:"):
+        from agent.diagrams.templates.physics import PHYSICS_TEMPLATES
+        tmpl_name = ref[5:]
+        tmpl = PHYSICS_TEMPLATES.get(tmpl_name)
+        if tmpl:
+            code_filled = tmpl["code"].format(**tmpl.get("defaults", {}))
+            uri = render_tikz_full(code_filled)
+            if uri:
+                return f'\n\n![diagram]({uri})\n\n'
+    return match.group(0)
 
-        # Check if it's a physics template reference
-        if template_ref.startswith("phys:"):
-            from agent.diagrams.templates.physics import PHYSICS_TEMPLATES
-            tmpl_name = template_ref[5:]
-            tmpl = PHYSICS_TEMPLATES.get(tmpl_name)
-            if tmpl:
-                code_filled = tmpl["code"].format(**tmpl.get("defaults", {}))
-                uri = render_tikz_full(code_filled)
-                if uri:
-                    return f'\n\n![diagram]({uri})\n\n'
-            return match.group(0)
 
-        template = template_ref or "general"
-        uri = render_tikz(code, template)
-        if uri:
-            return f'\n\n![diagram]({uri})\n\n'
+def _replace_tikz_block(match):
+    template_ref = match.group(1) or ""
+    code = match.group(2).strip()
+    if template_ref.startswith("econ:"):
+        from agent.diagrams.templates.economics import render_template as econ_render
+        tmpl_name = template_ref[5:]
+        tmpl_code = econ_render(tmpl_name)
+        if tmpl_code:
+            uri = render_tikz_full(tmpl_code)
+            if uri:
+                return f'\n\n![diagram]({uri})\n\n'
         return match.group(0)
-
-    return pattern.sub(_replace, content)
+    if template_ref.startswith("phys:"):
+        from agent.diagrams.templates.physics import PHYSICS_TEMPLATES
+        tmpl_name = template_ref[5:]
+        tmpl = PHYSICS_TEMPLATES.get(tmpl_name)
+        if tmpl:
+            code_filled = tmpl["code"].format(**tmpl.get("defaults", {}))
+            uri = render_tikz_full(code_filled)
+            if uri:
+                return f'\n\n![diagram]({uri})\n\n'
+        return match.group(0)
+    template = template_ref or "general"
+    uri = render_tikz(code, template)
+    if uri:
+        return f'\n\n![diagram]({uri})\n\n'
+    return match.group(0)
 
 
 def render_tikz_full(full_code: str) -> Optional[str]:

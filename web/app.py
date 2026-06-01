@@ -5,10 +5,12 @@ W5: Real-time LLM processing status with animated display.
 """
 import os
 import sys
+import json
 import queue
 import threading
 import time
 import traceback
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -25,14 +27,40 @@ _gcu.get_type = _patched_get_type
 import gradio as gr
 
 from agent.tutoring.core import Agent
+from agent.tutoring.core import (
+    _last_katex_fixes as _read_katex_fixes,
+    _last_raw_output,
+    _last_tool_calls,
+    _last_response_time,
+)
 from agent.tutoring.prompts import welcome_message
-from agent.config import SUBJECTS, SUBJECT_BY_CODE
+from agent.config import SUBJECTS, SUBJECT_BY_CODE, PROJECT_ROOT
 from agent.database import (
     create_conversation, get_total_cost, get_daily_costs, check_budget,
     get_messages,
 )
 from agent.ocr.vision import grade_homework
 from agent.security import validate_file, strip_exif, detect_injection
+
+# ── Debug log ──
+DEBUG_LOG = PROJECT_ROOT / "data" / "gui_debug.log"
+_MAX_LOG_ENTRIES = 500  # keep last 500 entries
+
+
+def _log_debug(entry: dict):
+    """Append a JSON line to the debug log. Auto-rotates to keep size bounded."""
+    entry["ts"] = datetime.now().isoformat()
+    try:
+        DEBUG_LOG.parent.mkdir(parents=True, exist_ok=True)
+        lines = []
+        if DEBUG_LOG.exists():
+            lines = DEBUG_LOG.read_text().strip().split("\n")
+        lines.append(json.dumps(entry, ensure_ascii=False, default=str))
+        if len(lines) > _MAX_LOG_ENTRIES:
+            lines = lines[-_MAX_LOG_ENTRIES:]
+        DEBUG_LOG.write_text("\n".join(lines) + "\n")
+    except Exception:
+        pass  # never crash the app because of logging
 
 # ── State ──
 AGENT_INSTANCES: dict = {}  # session_id → Agent
@@ -240,6 +268,21 @@ def chat_fn(message: str, history: list, session_id: str, subject_code: str):
         from agent.database import save_message
         save_message(agent.conv_id, "user", message)
         save_message(agent.conv_id, "assistant", response)
+
+    # Debug log
+    _log_debug({
+        "session": session_id[:8],
+        "subject": subject_code or agent.current_subject,
+        "user_msg": message[:300],
+        "response_len": len(response),
+        "has_svg": "data:image/svg" in response,
+        "raw_len": len(_last_raw_output),
+        "katex_fixes": dict(_read_katex_fixes),
+        "tool_calls": list(_last_tool_calls),
+        "elapsed_s": round(_last_response_time, 2),
+        "error": result_container["error"],
+        "response": response[:5000],
+    })
 
     yield "", history, _render_status("done")
 

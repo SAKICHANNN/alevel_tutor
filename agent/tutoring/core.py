@@ -59,13 +59,13 @@ def _sanitize_output(content: str) -> str:
             break
 
     # Detect ASCII art diagrams (only if no rendered diagrams present)
-    if "data:image/svg" not in content:
+    if "data:image/" not in content:
         ascii_matches = _ASCII_ART_PATTERN.findall(content)
-        if len(ascii_matches) >= 5:
+        if len(ascii_matches) >= 3:
             content += (
                 "\n\n---\n"
                 "⚠️ **图表提示**：以上包含 ASCII 字符拼图，可能排版错乱。"
-                "请回复「用 Mermaid 重画」让我重新绘制。"
+                "请重新提问，我会用正确的图表格式回答。"
             )
 
     return content

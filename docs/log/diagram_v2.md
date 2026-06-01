@@ -1,5 +1,13 @@
 # Diagram V2 Development Log
 
+## Phase 0 — 2026-06-01
+
+### commit 89aa7a8: econ diagrams learning plan
+- `docs/plans/econ_diagrams_learn_plan.md` — Phase 0 research: 经济学考试所需图类型、现有 TikZ/Mermaid 方案、VLM 验证策略
+
+### commit 227f4f0: workflow specification
+- `docs/plans/diagram_system_v2.md` §6 — 工作流规范：分支策略、commit 格式、log 编写、测试先行、debug 流程、回滚 guard
+
 ## Phase 1 — 2026-06-01
 
 ### commit 7946281: Python matplotlib plotter
@@ -46,6 +54,18 @@
 ### commit 59ab005: shading uses equilibrium labels
 - 填色区域改用 Pe/Qe 标签代替手动 x1/x2 坐标
 - 避免 LLM 猜测网格坐标导致填色错位
+
+### commit d08a56d: 48 diagram tests
+- 48 项图表测试全部通过
+- VLM 验证：Grade A on 2/3 diagram types
+
+### commit 1c1664c: max_tokens 4096→8192
+- 避免长回复（含多张图表）被截断
+- 后进一步扩到 20480
+
+### commit 99ae2d7: ASCII detection patch
+- `_sanitize_output` ASCII 检测同时检查 `data:image/png`（不限于 svg）
+- 修复：PNG 图表存在时误报 ASCII 警告
 
 ### commit 76b4271: PNG → SVG output
 - 输出格式从 base64 PNG (50KB) 切换到 base64 SVG (16KB)，体积 3x 减小

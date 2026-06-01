@@ -64,7 +64,7 @@ print("\n" + "=" * 60)
 print("2. PRE-BUILT TEMPLATES (9 ECON)")
 print("=" * 60)
 
-templates = [t for t in list_templates() if t["key"] != "tariff"]
+templates = list_templates()
 test("2.1 Template count", lambda: len(templates) >= 9)
 
 for tmpl in templates:

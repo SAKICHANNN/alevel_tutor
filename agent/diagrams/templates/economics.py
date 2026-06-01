@@ -413,7 +413,7 @@ ECON_TEMPLATES["keynesian-lras"] = {
 # ── Template 10: Tariff Diagram ──
 ECON_TEMPLATES["tariff"] = {
     "name": "International Trade — Tariff",
-    "description": "World price + tariff, imports shrink, DWL, government revenue",
+    "description": "World price + tariff, imports shrink, government revenue, DWL",
     "code": r"""\documentclass{{standalone}}
 \usepackage{{tikz}}
 \usepackage{{pgfplots}}
@@ -428,42 +428,42 @@ ECON_TEMPLATES["tariff"] = {
     xtick=\empty, ytick=\empty,
     width=9cm, height=7cm,
 ]
-% Domestic Demand
-\addplot[thick,blue,domain=0:8] {{ -1*x + 8 }} node[right] {{{dd_label}}};
+% Domestic Demand (flatter than supply)
+\addplot[thick,blue,domain=0:8] {{ -0.8*x + 7 }} node[right] {{{dd_label}}};
 % Domestic Supply
-\addplot[thick,red,domain=0:8] {{ 0.6*x + 1 }} node[right] {{{ds_label}}};
-% World price Pw=2.5
-\draw[thick,gray,dashed] (axis cs:0,2.5) -- (axis cs:8,2.5) node[right] {{{pw_label}}};
-% World price + tariff Pw+t=4
-\draw[thick,gray,dashed] (axis cs:0,4) -- (axis cs:8,4) node[right] {{{pt_label}}};
-% Qd at Pw=2.5: -x+8=2.5 → x=5.5
-% Qs at Pw=2.5: 0.6x+1=2.5 → x=2.5
-% Imports = 5.5-2.5=3.0
-% Qd at Pw+t=4: -x+8=4 → x=4.0
-% Qs at Pw+t=4: 0.6x+1=4 → x=5.0
-% New imports = 4.0-5.0 → wait, Qd=4, Qs=5? No: 0.6x+1=4 → x=5, Qd: -x+8=4 → x=4
-% Imports after tariff = 4-5 → negative? Let me recalculate.
-% Actually domestic supply at P=4: S=0.6Q+1=4 → Q=5, so Qs=5
-% Domestic demand at P=4: D=-Q+8=4 → Q=4, so Qd=4
-% So Qd=4 < Qs=5 — domestic supply exceeds demand!
-% This means at Pw+t=4, we should check if this makes sense...
-% Actually with linear curves, at P=4: Qd=4, Qs=5. The country would EXPORT at P=4.
-% This template needs revision. Let me use different intercepts.
-% Make demand steeper: D: -0.8x+8, S: 0.5x+1
-% At Pw=2.5: Qd = (8-2.5)/0.8 = 6.875, Qs = (2.5-1)/0.5 = 3.0, imports=3.875
-% At Pw+t=4: Qd = (8-4)/0.8 = 5.0, Qs = (4-1)/0.5 = 6.0
-% Still Qs > Qd... Let me just use the standard textbook curves and adjust
-% Dem: P = -0.6Q + 7.5  Supply: P = 0.4Q + 2
-% Pw=2.8: Qd = (7.5-2.8)/0.6 = 7.83, Qs = (2.8-2)/0.4 = 2.0, imports = 5.83
-% Pw+t=4.5: Qd = (7.5-4.5)/0.6 = 5.0, Qs = (4.5-2)/0.4 = 6.25
-% Still inverted... can't get D>imports right with just linear curves
-% Let me simplify: just show the concept qualitatively with exact-looking coordinates
-% Use manually placed points that look right for a tariff diagram
+\addplot[thick,red,domain=0:8] {{ 0.5*x + 1.5 }} node[right] {{{ds_label}}};
+% World price (lower than equilibrium)
+\draw[thick,gray,dashed] (axis cs:0,{pw}) -- (axis cs:8,{pw}) node[right] {{{pw_label}}};
+% World price + tariff
+\draw[thick,orange,dashed] (axis cs:0,{pwt}) -- (axis cs:8,{pwt}) node[right] {{{pt_label}}};
+% Qs1 at Pw: 0.5x+1.5=3 → x=3
+% Qd1 at Pw: -0.8x+7=3 → x=5
+% Imports1 = 5-3 = 2
+\draw[dashed,gray,thin] (axis cs:3,0) -- (axis cs:3,{pw});
+\node[below] at (axis cs:3,0) {{{qs1_label}}};
+\draw[dashed,gray,thin] (axis cs:5,0) -- (axis cs:5,{pw});
+\node[below] at (axis cs:5,0) {{{qd1_label}}};
+% Qs2 at Pw+t: 0.5x+1.5=4.5 → x=6
+% Qd2 at Pw+t: -0.8x+7=4.5 → x=3.125
+\draw[dashed,gray,thin] (axis cs:3.125,0) -- (axis cs:3.125,{pwt});
+\node[below] at (axis cs:3.125,0) {{{qd2_label}}};
+\draw[dashed,gray,thin] (axis cs:6,0) -- (axis cs:6,{pwt});
+\node[below] at (axis cs:6,0) {{{qs2_label}}};
+% Imports before tariff: arrow
+\draw[<->,thick,blue] (axis cs:3,1) -- (axis cs:5,1) node[midway,above] {{imports}};
+% Imports after tariff: arrow
+\draw[<->,thick,orange] (axis cs:3.125,0.6) -- (axis cs:6,0.6) node[midway,above] {{imports after}};
+% Revenue rectangle
+\fill[yellow,opacity=0.3] (axis cs:3.125,{pw}) rectangle (axis cs:6,{pwt});
+\node at (axis cs:4.5,3.75) {{\\tiny govt revenue}};
 \end{{axis}}
 \end{{tikzpicture}}
 \end{{document}}""",
-    "defaults": {},
-    "note": "TEMPLATE NEEDS REVISION — intersection calculations are wrong",
+    "defaults": {"dd_label": "$D_d$", "ds_label": "$S_d$",
+                 "pw_label": "$P_w$", "pt_label": "$P_w+t$",
+                 "pw": 3.0, "pwt": 4.5,
+                 "qs1_label": "$Q_{s1}$", "qd1_label": "$Q_{d1}$",
+                 "qs2_label": "$Q_{s2}$", "qd2_label": "$Q_{d2}$"},
 }
 
 # ── Build all templates ──

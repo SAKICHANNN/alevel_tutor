@@ -182,6 +182,74 @@ def render_graphviz(code: str) -> Optional[str]:
     return None
 
 
+# ── Extraction + Rendering ──
+
+def extract_and_render_plot(content: str) -> str:
+    """Extract ```plot JSON blocks and render via matplotlib."""
+    from agent.diagrams.plotter import render_economics
+    from agent.diagrams.spec_builder import build_spec
+
+    pattern = re.compile(r'```plot\n(.*?)```', re.DOTALL)
+    def _replace(m):
+        try:
+            params = json.loads(m.group(1))
+            if "type" in params and "curves" not in params:
+                spec = build_spec(params)
+            else:
+                spec = params
+            uri = render_economics(spec)
+            if uri:
+                return f"![diagram]({uri})"
+        except Exception:
+            pass
+        return m.group(0)
+    return pattern.sub(_replace, content)
+
+
+def extract_and_render_mermaid(content: str) -> str:
+    """Extract ```mermaid blocks and render. Fallback to code block."""
+    pattern = re.compile(r'```mermaid\n(.*?)```', re.DOTALL)
+    def _replace(m):
+        uri = render_mermaid(m.group(1))
+        if uri:
+            return f"![diagram]({uri})"
+        return m.group(0)
+    return pattern.sub(_replace, content)
+
+
+def extract_and_render_tikz(content: str) -> str:
+    """Extract ```tikz blocks and render. Fallback to code block."""
+    template_pattern = re.compile(r'^```tikz\s+template=(\w+)\n(.*?)```', re.DOTALL | re.MULTILINE)
+    bare_pattern = re.compile(r'^```tikz\n(.*?)```', re.DOTALL)
+
+    def _render_template(m):
+        uri = render_tikz(m.group(2), m.group(1))
+        if uri:
+            return f"![diagram]({uri})"
+        return m.group(0)
+
+    def _render_bare(m):
+        uri = render_tikz(m.group(1), "general")
+        if uri:
+            return f"![diagram]({uri})"
+        return m.group(0)
+
+    content = template_pattern.sub(_render_template, content)
+    content = bare_pattern.sub(_render_bare, content)
+    return content
+
+
+def extract_and_render_vegalite(content: str) -> str:
+    """Extract ```vega-lite JSON blocks and render. Fallback."""
+    pattern = re.compile(r'```(?:vegalite|vega-lite)\n(.*?)```', re.DOTALL)
+    def _replace(m):
+        uri = render_vegalite(m.group(1))
+        if uri:
+            return f"![diagram]({uri})"
+        return m.group(0)
+    return pattern.sub(_replace, content)
+
+
 def render_all_diagrams(content: str) -> str:
     """Master post-processor: extract + render all diagram code blocks."""
     errors = 0

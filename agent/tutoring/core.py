@@ -33,9 +33,11 @@ console = Console()
 # ── W5: Output sanitizer — detect self-correction artifacts ──
 
 _SELF_CORRECTION_PATTERNS = [
-    r'(?:❌|不对|等等|重新算|实际上|查到了).*?(?:不对|重新|纠正)',
+    r'(?:❌|不对，|等等，重新|重新算一下|查到了，).*?(?:不对|重新|纠正)',
     r'等等.*?重新.*?算',
 ]
+# Exclude code blocks from detection
+_CODE_BLOCK_RE = re.compile(r'```[^`]*```', re.DOTALL)
 
 _ASCII_ART_PATTERN = re.compile(r'[┌┐└┘├┤│─┬┴┼╭╮╰╯→←↑↓●○]')
 
@@ -140,6 +142,8 @@ def _sanitize_output(content: str) -> str:
     _last_katex_fixes.clear()
     _last_katex_fixes.update(katex_fixes)
 
+    # W5: Self-correction detection — skip code blocks to avoid false positives
+    check_content = _CODE_BLOCK_RE.sub('', content)
     for pattern in _SELF_CORRECTION_PATTERNS:
         if re.search(pattern, content, re.IGNORECASE):
             if "⚠️" not in content[:200]:

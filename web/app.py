@@ -27,17 +27,7 @@ _gcu.get_type = _patched_get_type
 import gradio as gr
 
 from agent.tutoring.core import Agent
-from agent.tutoring.core import (
-    _last_katex_fixes as _read_katex_fixes,
-    _last_raw_output,
-    _last_tool_calls,
-    _last_response_time,
-    _last_model,
-    _last_svg_count,
-    _last_conv_len,
-    _token_limit_enabled,
-    _budget_enabled,
-)
+import agent.tutoring.core as _core
 from agent.tutoring.prompts import welcome_message
 from agent.config import SUBJECTS, SUBJECT_BY_CODE, PROJECT_ROOT
 from agent.database import (
@@ -237,19 +227,19 @@ def chat_fn(message: str, history: list, session_id: str, subject_code: str):
     _log_debug({
         "session": session_id[:8],
         "subject": subject_code or agent.current_subject,
-        "model": _last_model,
-        "conv_len": _last_conv_len,
-        "token_limit": _token_limit_enabled,
-        "budget": _budget_enabled,
+        "model": _core._last_model,
+        "conv_len": _core._last_conv_len,
+        "token_limit": _core._token_limit_enabled,
+        "budget": _core._budget_enabled,
         "user_msg": message[:300],
         "response_len": len(response),
-        "svg_count": _last_svg_count,
-        "raw_len": len(_last_raw_output),
-        "katex_fixes": dict(_read_katex_fixes),
-        "tool_calls": list(_last_tool_calls),
-        "elapsed_s": round(_last_response_time, 2),
+        "svg_count": _core._last_svg_count,
+        "raw_len": len(_core._last_raw_output),
+        "katex_fixes": dict(_core._last_katex_fixes),
+        "tool_calls": list(_core._last_tool_calls),
+        "elapsed_s": round(_core._last_response_time, 2),
         "error": result_container["error"],
-        "response": response[:5000],
+        "response": response[:15000],
     })
 
     yield "", history, ""

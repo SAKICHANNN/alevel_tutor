@@ -490,11 +490,15 @@ class Agent:
         _last_raw_output = ""
         _last_tool_calls = []
         _last_response_time = 0.0
-        _last_model = ""
+        _last_model = MODELS["tutor"].model if "tutor" in MODELS else "unknown"
         _last_svg_count = 0
-        _last_conv_len = len(self.conversation)
 
         t_start = time.time()
+
+        # Append user message first, then record conv length
+        user_msg = {"role": "user", "content": user_input}
+        self.conversation.append(user_msg)
+        _last_conv_len = len(self.conversation)
         # W5: Prompt injection guard — check before processing
         is_injection, reason = detect_injection(user_input)
         if is_injection:
@@ -511,11 +515,8 @@ class Agent:
         detected = self._detect_subject(user_input)
         if detected and detected != self.current_subject:
             self.current_subject = detected
-            if self.conv_id:
-                update_conversation(self.conv_id, subject_code=detected)
-
-        user_msg = {"role": "user", "content": user_input}
-        self.conversation.append(user_msg)
+        if self.conv_id:
+            update_conversation(self.conv_id, subject_code=detected)
 
         if self.conv_id:
             save_message(self.conv_id, "user", user_input)
@@ -566,7 +567,7 @@ class Agent:
         # Preserve reasoning_content for API continuity
         reasoning_content = msg.get("reasoning_content", "")
 
-        for _ in range(6):
+        for _ in range(4):
             if msg.get("tool_calls"):
                 api_messages.append(msg)
                 if self.conv_id:
@@ -614,15 +615,13 @@ class Agent:
                 break
 
         final_content = msg.get("content", "")
-        # W5: Save reasoning_content for API continuity (DeepSeek requires it)
         reasoning = msg.get("reasoning_content", "")
-        # Store raw output before sanitization for debug logging
         _last_raw_output = final_content
         _last_response_time = time.time() - t_start
-        _last_model = MODELS["tutor"].model if "tutor" in MODELS else "unknown"
-        _last_svg_count = final_content.count("data:image/svg+xml;base64,") if final_content else 0
-        # W5: Sanitize output — remove self-correction artifacts
+        # Sanitize — this renders ```plot → SVG
         final_content = _sanitize_output(final_content)
+        # Count SVGs AFTER rendering
+        _last_svg_count = final_content.count("data:image/svg+xml;base64,") if final_content else 0
         assistant_msg = {"role": "assistant", "content": final_content}
         if reasoning:
             assistant_msg["reasoning_content"] = reasoning

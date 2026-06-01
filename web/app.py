@@ -96,117 +96,60 @@ def _get_welcome():
 
 STATUS_STYLE = """
 <style>
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
-@keyframes dotPulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 1; }
-}
-.status-container {
+.status-grid {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
   justify-content: center;
-  padding: 4px 0;
+  padding: 6px 0;
 }
-.agent-status {
-  animation: slideIn 0.25s ease-out;
-  padding: 10px 18px;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 600;
+.status-cell {
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
   text-align: center;
   white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  transition: all 0.3s ease;
+  opacity: 0.35;
+  filter: grayscale(0.6);
+  transform: scale(0.95);
 }
-.agent-status .dot { display: inline-block; animation: dotPulse 1.4s infinite; }
-.agent-status .dot:nth-child(2) { animation-delay: 0.2s; }
-.agent-status .dot:nth-child(3) { animation-delay: 0.4s; }
-.agent-status.thinking {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+.status-cell.active {
+  opacity: 1;
+  filter: grayscale(0);
+  transform: scale(1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
-.agent-status.searching {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: #fff;
-}
-.agent-status.grading {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  color: #fff;
-}
-.agent-status.pattern {
-  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-  color: #1a1a2e;
-}
-.agent-status.done {
-  background: linear-gradient(135deg, #a8e063 0%, #56ab2f 100%);
-  color: #fff;
-  font-size: 18px;
-  padding: 16px 28px;
-}
+.c-think { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; }
+.c-textbook { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: #fff; }
+.c-paper { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: #1a1a2e; }
+.c-pattern { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: #1a1a2e; }
+.c-technique { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: #1a1a2e; }
 </style>
 """
 
-STATUS_TEMPLATES = {
-    "thinking": (
-        '<div class="agent-status thinking">'
-        '🧠 深度思考<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
-        '</div>'
-    ),
-    "search_textbook": (
-        '<div class="agent-status searching">'
-        '📚 教材<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
-        '</div>'
-    ),
-    "search_past_paper": (
-        '<div class="agent-status searching">'
-        '📝 真题<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
-        '</div>'
-    ),
-    "get_exam_pattern": (
-        '<div class="agent-status pattern">'
-        '🎯 套路<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
-        '</div>'
-    ),
-    "search_exam_techniques": (
-        '<div class="agent-status pattern">'
-        '💡 技巧<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
-        '</div>'
-    ),
-    "grade_homework_image": (
-        '<div class="agent-status grading">'
-        '📸 批改<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
-        '</div>'
-    ),
-    "done": (
-        '<div class="agent-status done">'
-        '✅ 回答完成'
-        '</div>'
-    ),
-}
+STATUS_MATRIX = [
+    ("thinking", "c-think", "🧠 思考"),
+    ("search_textbook", "c-textbook", "📚 教材"),
+    ("search_past_paper", "c-paper", "📝 真题"),
+    ("get_exam_pattern", "c-pattern", "🎯 套路"),
+    ("search_exam_techniques", "c-technique", "💡 技巧"),
+]
 
-STATUS_KEY_MAP = {
-    "🎯 正在深度思考...": "thinking",
-    "📚 正在检索教材...": "search_textbook",
-    "📝 正在检索真题...": "search_past_paper",
-    "🎯 正在分析解题套路...": "get_exam_pattern",
-    "💡 正在查找答题技巧...": "search_exam_techniques",
-    "📸 正在 AI 批改...": "grade_homework_image",
-}
-
-
-def _render_multi_status(active_keys: set) -> str:
-    """Render multiple status cards in parallel."""
-    cards = [STATUS_TEMPLATES.get(k, STATUS_TEMPLATES["thinking"]) for k in active_keys]
-    return STATUS_STYLE + '<div class="status-container">' + "".join(cards) + '</div>'
+def _render_matrix(active_keys: set) -> str:
+    cells = []
+    for key, cls, label in STATUS_MATRIX:
+        active = "active" if key in active_keys else ""
+        cells.append(f'<div class="status-cell {cls} {active}">{label}</div>')
+    return STATUS_STYLE + '<div class="status-grid">' + "".join(cells) + '</div>'
 
 
 def _render_status(status_key: str) -> str:
-    return _render_multi_status({status_key})
+    return _render_matrix({status_key})
 
 
 # ── Callbacks ──
@@ -250,20 +193,20 @@ def chat_fn(message: str, history: list, session_id: str, subject_code: str):
             if not thread.is_alive():
                 break
             if active_keys:
-                yield "", history, _render_multi_status(active_keys)
+                yield "", history, _render_matrix(active_keys)
             continue
 
         if status == "__DONE__":
-            yield "", history, _render_multi_status({"done"})
+            yield "", history, ""
             break
 
         key = STATUS_KEY_MAP.get(status, "thinking")
         if key == "thinking":
-            active_keys = {"thinking"}  # thinking resets all tool cards
+            active_keys = {"thinking"}
         else:
             active_keys.discard("thinking")
             active_keys.add(key)
-        yield "", history, _render_multi_status(active_keys)
+        yield "", history, _render_matrix(active_keys)
 
     thread.join(timeout=5)
 

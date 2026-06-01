@@ -84,8 +84,8 @@ def render_economics(spec: dict) -> Optional[str]:
                     facecolor='white', edgecolor='none', pad_inches=0.2)
         # Also generate compact PNG for inline display
         buf = io.BytesIO()
-        fig.savefig(buf, format='png', dpi=55, bbox_inches='tight',
-                    facecolor='white', edgecolor='none', pad_inches=0.1)
+        fig.savefig(buf, format='png', dpi=100, bbox_inches='tight',
+                    facecolor='white', edgecolor='none', pad_inches=0.15)
         plt.close(fig)
         buf.seek(0)
         b64 = base64.b64encode(buf.read()).decode('ascii')
@@ -102,11 +102,11 @@ def _plot(spec: dict):
     x_max = spec.get("x_max", 10)
     y_max = spec.get("y_max", 10)
 
-    fig, ax = plt.subplots(figsize=(9, 7))
+    fig, ax = plt.subplots(figsize=(10, 8))
     ax.set_xlim(0, x_max)
     ax.set_ylim(0, y_max)
-    ax.set_xlabel(axes.get("x", "Q"), fontsize=14, labelpad=10)
-    ax.set_ylabel(axes.get("y", "P"), fontsize=14, labelpad=10)
+    ax.set_xlabel(axes.get("x", "Quantity"), fontsize=16, fontweight='bold', labelpad=12)
+    ax.set_ylabel(axes.get("y", "Price"), fontsize=16, fontweight='bold', labelpad=12)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
@@ -173,10 +173,10 @@ def _draw_line(ax, c, x_max, y_max, drawn):
         idx = min(int(len(x_vals) * label_pos), len(x_vals) - 1)
         if idx >= 0:
             ax.annotate(label, xy=(x_vals[idx], y_vals[idx]),
-                        fontsize=10, color=color, fontweight='bold',
-                        xytext=(6, 6), textcoords='offset points',
-                        bbox=dict(boxstyle='round,pad=0.1', facecolor='white',
-                                 edgecolor='none', alpha=0.85))
+                        fontsize=13, color=color, fontweight='bold',
+                        xytext=(8, 8), textcoords='offset points',
+                        bbox=dict(boxstyle='round,pad=0.15', facecolor='white',
+                                 edgecolor=color, linewidth=0.8, alpha=0.9))
 
     drawn[name] = {"type": "line", "i": i, "s": s}
 
@@ -206,19 +206,19 @@ def _draw_hline(ax, c, x_max, drawn):
 
 def _draw_eq_point(ax, xy, eq):
     x, y = xy
-    # Projection lines to axes
-    ax.plot([x, x], [0, y], '--', color='#999', linewidth=0.7, alpha=0.4, zorder=1)
-    ax.plot([0, x], [y, y], '--', color='#999', linewidth=0.7, alpha=0.4, zorder=1)
-    # Dot
-    ax.plot(x, y, 'o', color=COLORS["eq"], markersize=8, zorder=5,
-            markeredgecolor='white', markeredgewidth=1.5)
+    # Projection lines to axes — Cambridge standard: dashed from equilibrium
+    ax.plot([x, x], [0, y], '--', color='#666', linewidth=1.0, alpha=0.5, zorder=1)
+    ax.plot([0, x], [y, y], '--', color='#666', linewidth=1.0, alpha=0.5, zorder=1)
+    # Equilibrium dot
+    ax.plot(x, y, 'o', color=COLORS["eq"], markersize=10, zorder=5,
+            markeredgecolor='white', markeredgewidth=2)
     label = eq.get("label", "")
     if label:
-        offset = eq.get("offset", (10, 10))
-        ax.annotate(label, xy=(x, y), fontsize=11, fontweight='bold',
+        offset = eq.get("offset", (12, 12))
+        ax.annotate(label, xy=(x, y), fontsize=14, fontweight='bold',
                     xytext=offset, textcoords='offset points',
-                    bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
-                             edgecolor='none', alpha=0.8))
+                    bbox=dict(boxstyle='round,pad=0.25', facecolor='white',
+                             edgecolor='#999', linewidth=0.5, alpha=0.9))
 
 def _draw_shading(ax, sh, drawn, x_max):
     stype = sh.get("type", "between")

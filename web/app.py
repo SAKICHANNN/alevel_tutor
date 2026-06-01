@@ -9,6 +9,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Workaround: Gradio 4.44.1 schema bug on Python 3.9
+# TypeError: argument of type 'bool' is not iterable in get_type()
+import gradio_client.utils as _gcu
+_orig_get_type = _gcu.get_type
+def _patched_get_type(schema):
+    if isinstance(schema, bool):
+        return "boolean"
+    return _orig_get_type(schema)
+_gcu.get_type = _patched_get_type
+
 import gradio as gr
 
 from agent.tutoring.core import Agent
@@ -227,7 +237,6 @@ def main():
         server_name="127.0.0.1",
         server_port=7860,
         share=False,
-        show_error=True,
     )
 
 

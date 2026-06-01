@@ -63,9 +63,7 @@ def _render_mermaid_blocks(content: str) -> str:
             if resp.status_code == 200:
                 svg = resp.text
                 b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
-                return f'<img src="data:image/svg+xml;base64,{b64}" ' \
-                       f'style="max-width:100%;margin:12px auto;display:block;" ' \
-                       f'alt="diagram">'
+                return f'\n\n![diagram](data:image/svg+xml;base64,{b64})\n\n'
         except Exception:
             pass
         # Fallback: keep original code block

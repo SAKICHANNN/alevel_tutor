@@ -139,11 +139,19 @@ Unicode 伪公式（`x²` 应写 `$x^2$`）。ASCII 字符画图。
 
    **常见重叠场景**：学生对同一道题既问解法又问套路 → 真题+套路同时触发。学生既要你出题又要你讲备考技巧 → 真题+技巧同时触发。不要选一个放弃另一个。
 
-4. **绘图规则**：
-   - 经济图 → `\`\`\`plot` JSON
-   - 电路/化学结构/力学图 → `\`\`\`tikz template=xxx`
-   - 流程图 → `\`\`\`mermaid`
-   - **禁止** ASCII 字符画图。不确认的类型先搜课本。
+4. **绘图规则（严格按内容类型选工具，不要乱用）**：
+
+| 图类型 | 工具 | 正确示例 |
+|--------|------|---------|
+| 供需曲线、AD-AS、PPC、外部性等经济图 | `\`\`\`plot` JSON | `{"type":"demand_supply"}` |
+| **电路图**（含电阻、电池、导线、电流表） | `\`\`\`tikz template=circuit` | `\begin{circuitikz}...` |
+| 力学图、自由体图、斜面 | `\`\`\`tikz template=force` | `\begin{tikzpicture}...` |
+| 化学结构式 | `\`\`\`tikz template=chemfig` | `\chemfig{...}` |
+| 函数图、坐标几何 | `\`\`\`tikz template=graph` | `\begin{tikzpicture}\begin{axis}...` |
+| 流程图、状态机、概念图 | `\`\`\`mermaid` | `graph TD; A-->B;` |
+
+**禁止用 mermaid 画电路图、物理图、经济图、数学图**。mermaid 只用于流程图/概念图。
+**禁止** ASCII 字符画图。不确认的类型先搜课本。
 
 ## 工具列表
 

@@ -205,6 +205,26 @@ def _mock_validate_size():
 ok8, reason8 = _mock_validate_size()
 test("2.10 file over size limit rejected", lambda: assert_false(ok8))
 
+# 2.11 EXT_TO_MIME map covers all extensions
+from agent.security import EXT_TO_MIME
+for ext in ALLOWED_EXTENSIONS:
+    test(f"2.11 MIME for {ext}", lambda ext=ext: assert_true(ext in EXT_TO_MIME,
+        f"EXT_TO_MIME missing {ext}"))
+
+# 2.12 Temp file cleanup
+from agent.security import cleanup_temp_files, _temp_files
+_tf_before = len(_temp_files)
+img_c = PIL.Image.new("RGB", (5, 5), color="blue")
+tmp_clean = Path(tempfile.gettempdir()) / "test_cleanup.png"
+img_c.save(str(tmp_clean), "PNG")
+_clean_path = strip_exif(str(tmp_clean))
+test("2.12 temp file registered", lambda: assert_gt(len(_temp_files), _tf_before))
+cleanup_temp_files()
+test("2.13 temp files cleaned up", lambda: (
+    assert_eq(len(_temp_files), 0),
+    assert_false(Path(_clean_path).exists()),
+))
+
 
 # ═══════════════════════════════════════════════════════════
 # SECTION 3: EXIF Stripping
@@ -236,10 +256,11 @@ tmp_txt.write_text("hello")
 clean_txt = strip_exif(str(tmp_txt))
 test("3.6 non-image file returned as-is", lambda: assert_eq(clean_txt, str(tmp_txt)))
 
-# Cleanup
+# Cleanup (temp files registered by strip_exif will be auto-cleaned)
+from agent.security import cleanup_temp_files
+cleanup_temp_files()
 tmp_img.unlink(missing_ok=True)
-Path(clean).unlink(missing_ok=True)
-tmp_txt.unlink()
+tmp_txt.unlink(missing_ok=True)
 
 
 # ═══════════════════════════════════════════════════════════

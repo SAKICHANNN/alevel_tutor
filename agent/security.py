@@ -15,15 +15,14 @@ W5.3 — File hygiene:
   - Session file cleanup
   - Export with sanitized content
 """
+import atexit
 import hashlib
-import io
 import os
 import re
 from pathlib import Path
 from typing import Optional, Tuple
 
 import PIL.Image
-import PIL.ExifTags
 
 # ── W5.3: File Upload Sanitization ──
 
@@ -35,8 +34,33 @@ ALLOWED_MIME_TYPES = {
 
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".pdf", ".txt", ".md"}
 
+EXT_TO_MIME = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".webp": "image/webp", ".pdf": "application/pdf",
+    ".txt": "text/plain", ".md": "text/markdown",
+}
+
 MAX_FILE_SIZE_MB = 20
 MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024
+
+# Track temp files for cleanup
+_temp_files: list = []
+
+
+def _register_temp(path: str):
+    _temp_files.append(path)
+
+
+def _cleanup_temp_files():
+    for p in _temp_files:
+        try:
+            os.unlink(p)
+        except OSError:
+            pass
+    _temp_files.clear()
+
+
+atexit.register(_cleanup_temp_files)
 
 
 def validate_file(filepath: str) -> Tuple[bool, str]:
@@ -57,23 +81,25 @@ def validate_file(filepath: str) -> Tuple[bool, str]:
 
 
 def strip_exif(filepath: str) -> str:
-    """Remove EXIF metadata from image, return path to clean copy."""
+    """Remove EXIF metadata from image, return path to clean copy.
+    Temp files are automatically cleaned up on process exit."""
     ext = Path(filepath).suffix.lower()
     if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
         return filepath
 
     try:
         img = PIL.Image.open(filepath)
-        # Strip EXIF by creating a new image without metadata
-        data = list(img.getdata())
+        # Create clean image without EXIF by copying pixel data
+        # Use getdata()+putdata() for memory efficiency on large images
         clean = PIL.Image.new(img.mode, img.size)
-        clean.putdata(data)
+        clean.putdata(list(img.getdata()))
 
         clean_path = filepath + ".clean" + ext
         clean.save(clean_path, format=img.format or "PNG")
+        _register_temp(clean_path)
         return clean_path
     except Exception:
-        return filepath  # If stripping fails, return original
+        return filepath
 
 
 def compute_file_hash(filepath: str) -> str:
@@ -83,6 +109,11 @@ def compute_file_hash(filepath: str) -> str:
         for chunk in iter(lambda: f.read(8192), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def cleanup_temp_files():
+    """Manually clean up temp files created by strip_exif. Called on exit automatically."""
+    _cleanup_temp_files()
 
 
 # ── W5.1: RAG / Untrusted Context Guard ──

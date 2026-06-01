@@ -112,7 +112,95 @@ def system_prompt(subjects_summary: str = "") -> str:
 | `econ:price-ceiling` | 最高限价 (价格上限, 短缺) |
 | `econ:keynesian-lras` | 凯恩斯 LRAS (三阶段) |
 
-**用法**：输出 `\`\`\`tikz template=econ:ad-as\`\`\`` 即可渲染为精确图表。不要自己写 TikZ 经济图——用模板保证坐标精确！
+**用法**：输出 `\`\`\`tikz template=econ:ad-as\`\`\`` 即可渲染为精确图表。
+
+### 经济学自定义图表（JSON 参数化）
+
+**当模板不够用时**，你可以输出 JSON econ 图表规格，系统将用数学引擎渲染精确图表。
+
+**通用格式**：
+\`\`\`econ
+{
+  "axes": {"x": "横轴标签", "y": "纵轴标签"},
+  "x_max": 10, "y_max": 10,
+  "curves": [
+    {"name": "唯一ID", "type": "line|vertical|horizontal", "intercept": 截距, "slope": 斜率, "color": "#hex", "label": "标签"}
+  ],
+  "points": [
+    {"curve1": "D", "curve2": "S", "label": "E₁", "offset": [dx, dy]}
+  ],
+  "areas": [
+    {"type": "between|triangle|rectangle", "curve1": "上线名", "curve2": "下线名", "x1": 左边界, "x2": 右边界, "color": "#hex", "label": "标签", "label_pos": [x, y]}
+  ]
+}
+\`\`\`
+
+**曲线命名约定**（系统自动计算交点）：
+- 需求曲线用 "D", "D1", "D2"，截距高→低（如 7→5），斜率负（如 -1）
+- 供给曲线用 "S", "S1", "S2"，截距低→高（如 1.5→3），斜率正（如 0.6）
+- AD 用 "AD", "AD1"，斜率负（如 -0.9），截距大
+- SRAS 用 "SRAS"，斜率正（如 0.5）
+- LRAS 用 type "vertical"，x=潜在产出
+- 外部性：MPC/MSC 用相同斜率不同截距
+- 税收/补贴线：type "horizontal"，y=价格
+- 颜色：蓝=#2B5B84(需求/AD)，红=#C44E52(供给/SRAS)，橙=#E67E22(MSC)，深灰=#2C3E50(LRAS)
+
+**弹性调整**：要画 elastic demand（平坦），减小斜率的绝对值（如 -0.5）；inelastic（陡峭），增大绝对值（如 -1.5）。
+
+**交点标注**：只需列出曲线名对（如 "D"+"S"），系统自动解方程计算坐标并画点。
+
+**示例——需求右移**：
+\`\`\`econ
+{
+  "axes": {"x": "Quantity", "y": "Price ($)"},
+  "x_max": 9, "y_max": 9,
+  "curves": [
+    {"name": "D1", "type": "line", "intercept": 7, "slope": -1, "color": "#2B5B84", "label": "D₁"},
+    {"name": "D2", "type": "line", "intercept": 8.5, "slope": -1, "color": "#4C9BCF", "label": "D₂"},
+    {"name": "S", "type": "line", "intercept": 1.5, "slope": 0.6, "color": "#C44E52", "label": "S"}
+  ],
+  "points": [
+    {"curve1": "D1", "curve2": "S", "label": "E₁", "offset": [-15, 8]},
+    {"curve1": "D2", "curve2": "S", "label": "E₂", "offset": [8, 8]}
+  ]
+}
+\`\`\`
+
+**示例——负外部性**：
+\`\`\`econ
+{
+  "axes": {"x": "Quantity", "y": "Cost/Benefit ($)"},
+  "x_max": 8, "y_max": 8,
+  "curves": [
+    {"name": "D", "type": "line", "intercept": 7, "slope": -1, "color": "#2B5B84", "label": "D=MPB=MSB"},
+    {"name": "MPC", "type": "line", "intercept": 1.5, "slope": 0.6, "color": "#C44E52", "label": "MPC=S"},
+    {"name": "MSC", "type": "line", "intercept": 3, "slope": 0.6, "color": "#E67E22", "label": "MSC"}
+  ],
+  "points": [
+    {"curve1": "D", "curve2": "MPC", "label": "Eₚ", "offset": [8, -12]},
+    {"curve1": "D", "curve2": "MSC", "label": "Eₛ", "offset": [8, 8]}
+  ],
+  "areas": [
+    {"type": "between", "curve1": "MSC", "curve2": "MPC", "x1": "Eₛ", "x2": "Eₚ", "color": "#F1948A", "label": "DWL", "label_pos": [3.2, 4.3]}
+  ]
+}
+\`\`\`
+
+**示例——AD-AS 模型**：
+\`\`\`econ
+{
+  "axes": {"x": "Real GDP (Y)", "y": "Price Level (P)"},
+  "x_max": 10, "y_max": 8,
+  "curves": [
+    {"name": "AD", "type": "line", "intercept": 7.5, "slope": -0.9, "color": "#2B5B84", "label": "AD"},
+    {"name": "SRAS", "type": "line", "intercept": 2, "slope": 0.5, "color": "#C44E52", "label": "SRAS"},
+    {"name": "LRAS", "type": "vertical", "x": 5.5, "color": "#2C3E50", "label": "LRAS"}
+  ],
+  "points": [
+    {"curve1": "AD", "curve2": "SRAS", "label": "E₁", "offset": [8, 8]}
+  ]
+}
+\`\`\`不要自己写 TikZ 经济图——用模板保证坐标精确！
 
 ### 物理预置模板目录
 

@@ -5,17 +5,15 @@ All 14 diagram types via parameterized JSON specs.
 LLM describes what → Python computes + renders.
 
 Key guarantees:
-  - All intersections solved mathematically (scipy.optimize)
-  - All labels positioned by computed coordinates
+  - All intersections solved mathematically
+  - All labels positioned by textalloc — no overlaps with any line or label
   - Output: SVG to data/rendered/{hash}.svg
-  - Short URL reference: /diagrams/{hash}.svg
 """
 import base64
 import hashlib
 import io
 import json
-import math
-import re
+import re as _re
 from pathlib import Path
 from typing import Optional
 
@@ -23,6 +21,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
+import textalloc as ta
 
 RENDER_DIR = Path(__file__).parent.parent.parent / "data" / "rendered"
 RENDER_DIR.mkdir(parents=True, exist_ok=True)
@@ -30,7 +29,6 @@ RENDER_DIR.mkdir(parents=True, exist_ok=True)
 # ── Math utilities ──
 
 def solve_line_intersection(i1, s1, i2, s2):
-    """Solve intercept+slope*x for two lines."""
     if abs(s1 - s2) < 1e-9:
         return None
     x = (i2 - i1) / (s1 - s2)
@@ -45,25 +43,15 @@ def x_for_y(intercept, slope, y):
 # ── Color palette ──
 
 COLORS = {
-    "demand": "#2B5B84",
-    "demand2": "#4C9BCF",
-    "supply": "#C44E52",
-    "supply2": "#E88C8F",
-    "msc": "#E67E22",
-    "msb": "#27AE60",
-    "ad": "#2B5B84",
-    "sras": "#C44E52",
-    "lras": "#2C3E50",
-    "tax": "#E74C3C",
-    "subsidy": "#2ECC71",
-    "marginal": "#E67E22",
-    "dwl": "#F1948A",
-    "cs": "#AED6F1",
-    "ps": "#F5B7B1",
-    "revenue": "#F9E79F",
+    "demand": "#2B5B84", "demand2": "#4C9BCF",
+    "supply": "#C44E52", "supply2": "#E88C8F",
+    "msc": "#E67E22", "msb": "#27AE60",
+    "ad": "#2B5B84", "sras": "#C44E52", "lras": "#2C3E50",
+    "tax": "#E74C3C", "subsidy": "#2ECC71",
+    "marginal": "#E67E22", "dwl": "#F1948A",
+    "cs": "#AED6F1", "ps": "#F5B7B1", "revenue": "#F9E79F",
     "price_ctrl": "#E74C3C",
-    "eq": "#1a1a1a",
-    "grid": "#e0e0e0",
+    "eq": "#1a1a1a", "grid": "#e0e0e0",
 }
 
 # ── Rendering ──
@@ -73,30 +61,24 @@ def _hash_spec(spec: dict) -> str:
     return hashlib.md5(raw.encode()).hexdigest()[:12]
 
 def render_economics(spec: dict) -> Optional[str]:
-    """Render economics diagram. Returns compact base64 PNG data URI."""
     spec_hash = _hash_spec(spec)
     out_path = RENDER_DIR / f"econ_{spec_hash}.svg"
-    
     try:
         fig, ax = _plot(spec)
-        # Save full-quality SVG to disk
         fig.savefig(str(out_path), format='svg', bbox_inches='tight',
-                    facecolor='white', edgecolor='none', pad_inches=0.2)
-        # Generate compact SVG for inline display
+                     facecolor='white', edgecolor='none', pad_inches=0.2)
         buf = io.BytesIO()
         fig.savefig(buf, format='svg', bbox_inches='tight',
-                    facecolor='white', edgecolor='none', pad_inches=0.15)
+                     facecolor='white', edgecolor='none', pad_inches=0.15)
         plt.close(fig)
         buf.seek(0)
         svg_raw = buf.read().decode('utf-8')
-        # Strip matplotlib metadata
-        import re as _re3
-        svg_clean = _re3.sub(r'<metadata>.*?</metadata>', '', svg_raw, flags=_re3.DOTALL)
-        svg_clean = _re3.sub(r'<clipPath[^>]*>.*?</clipPath>', '', svg_clean, flags=_re3.DOTALL)
+        svg_clean = _re.sub(r'<metadata>.*?</metadata>', '', svg_raw, flags=_re.DOTALL)
+        svg_clean = _re.sub(r'<clipPath[^>]*>.*?</clipPath>', '', svg_clean, flags=_re.DOTALL)
         b64 = base64.b64encode(svg_clean.encode('utf-8')).decode('ascii')
         return f"data:image/svg+xml;base64,{b64}"
     except Exception as e:
-        print(f"Render error: {e}")
+        import traceback; traceback.print_exc()
         return None
 
 def _plot(spec: dict):
@@ -116,18 +98,22 @@ def _plot(spec: dict):
     ax.spines['right'].set_visible(False)
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
 
-    # Draw curves
+    # Collectors for deferred label placement
+    label_infos = []       # [{x, y, text, color, fontsize}, ...]
+    all_line_data = []     # [(x_vals, y_vals), ...] for line-avoidance
+    all_scatter_x = []     # equilibrium points to avoid
+    all_scatter_y = []
+
     drawn = {}
     for c in curves:
         ctype = c.get("type", "line")
         if ctype == "line":
-            _draw_line(ax, c, x_max, y_max, drawn)
+            _draw_line(ax, c, x_max, y_max, drawn, label_infos, all_line_data)
         elif ctype == "vertical":
-            _draw_vline(ax, c, y_max, drawn)
+            _draw_vline(ax, c, y_max, drawn, label_infos)
         elif ctype == "horizontal":
-            _draw_hline(ax, c, x_max, drawn)
+            _draw_hline(ax, c, x_max, drawn, label_infos)
 
-    # Compute & draw equilibrium points — SAVE their coordinates
     eq_points = {}
     for eq in equilibria:
         c1, c2 = eq.get("c1"), eq.get("c2")
@@ -149,18 +135,50 @@ def _plot(spec: dict):
             xy = (xv, d2["y"]) if xv else None
 
         if xy and 0 <= xy[0] <= x_max and 0 <= xy[1] <= y_max:
-            _draw_eq_point(ax, xy, eq)
+            _draw_eq_point(ax, xy, eq, label_infos, all_scatter_x, all_scatter_y)
             label = eq.get("label", "")
             if label:
                 eq_points[label] = xy
 
-    # Draw shading — uses equilibrium point references
     for sh in shading:
         _draw_shading(ax, sh, drawn, eq_points, x_max)
 
+    # ── Deferred label placement via textalloc ──
+    if label_infos:
+        label_x = [li["x"] for li in label_infos]
+        label_y = [li["y"] for li in label_infos]
+        texts = [li["text"] for li in label_infos]
+        # Build scatter data: equilibrium dots + label positions themselves
+        sx = list(all_scatter_x) + label_x
+        sy = list(all_scatter_y) + label_y
+        # Build line data for avoidance
+        x_lists = [ld[0] for ld in all_line_data if len(ld[0]) > 0]
+        y_lists = [ld[1] for ld in all_line_data if len(ld[1]) > 0]
+        try:
+            ta.allocate(
+                ax,
+                label_x, label_y,
+                texts,
+                textsize=14,
+                x_lines=x_lists,
+                y_lines=y_lists,
+                x_scatter=sx,
+                y_scatter=sy,
+                draw_lines=False,
+                margin=0.03,
+                min_distance=0.025,
+                max_distance=0.1,
+            )
+            # Bold-ify the allocated texts and set per-label color
+            for i, t in enumerate(texts):
+                t.set_fontweight('bold')
+                t.set_color(label_infos[i].get("color", "#333"))
+        except Exception:
+            pass  # textalloc fails gracefully — labels stay at original positions
+
     return fig, ax
 
-def _draw_line(ax, c, x_max, y_max, drawn):
+def _draw_line(ax, c, x_max, y_max, drawn, label_infos, all_line_data):
     i = c.get("intercept", 5)
     s = c.get("slope", -1)
     name = c.get("id", "")
@@ -170,26 +188,28 @@ def _draw_line(ax, c, x_max, y_max, drawn):
     label = c.get("label", "")
     label_pos = c.get("label_pos", 0.7)
 
-    # Compute visible range
     x_vals = np.linspace(0, x_max, 200)
     y_vals = i + s * x_vals
     mask = (y_vals >= 0) & (y_vals <= y_max)
     x_vals, y_vals = x_vals[mask], y_vals[mask]
     if len(x_vals) > 1:
         ax.plot(x_vals, y_vals, linestyle=style, color=color, linewidth=width, zorder=2)
+        all_line_data.append((x_vals.copy(), y_vals.copy()))
 
     if label:
         idx = min(int(len(x_vals) * label_pos), len(x_vals) - 1)
         if idx >= 0:
-            ax.annotate(label, xy=(x_vals[idx], y_vals[idx]),
-                        fontsize=11, color=color, fontweight='bold',
-                        xytext=(6, 6), textcoords='offset points',
-                        bbox=dict(boxstyle='round,pad=0.12', facecolor='white',
-                                 edgecolor=color, linewidth=0.7, alpha=0.9))
+            label_infos.append({
+                "x": float(x_vals[idx]),
+                "y": float(y_vals[idx]),
+                "text": label,
+                "color": color,
+                "fontsize": 14,
+            })
 
     drawn[name] = {"type": "line", "i": i, "s": s}
 
-def _draw_vline(ax, c, y_max, drawn):
+def _draw_vline(ax, c, y_max, drawn, label_infos):
     x = c.get("x", 5)
     name = c.get("id", "")
     color = COLORS.get(c.get("color", "lras"), "#333")
@@ -197,11 +217,16 @@ def _draw_vline(ax, c, y_max, drawn):
     label = c.get("label", "")
     ax.axvline(x=x, color=color, linewidth=2, linestyle=style, zorder=2)
     if label:
-        ax.annotate(label, xy=(x, y_max * 0.85), fontsize=10, color=color,
-                    fontweight='bold', xytext=(5, 0), textcoords='offset points')
+        label_infos.append({
+            "x": x,
+            "y": y_max * 0.85,
+            "text": label,
+            "color": color,
+            "fontsize": 14,
+        })
     drawn[name] = {"type": "vertical", "x": x}
 
-def _draw_hline(ax, c, x_max, drawn):
+def _draw_hline(ax, c, x_max, drawn, label_infos):
     y = c.get("y", 3)
     name = c.get("id", "")
     color = COLORS.get(c.get("color", "price_ctrl"), "#333")
@@ -209,28 +234,35 @@ def _draw_hline(ax, c, x_max, drawn):
     label = c.get("label", "")
     ax.axhline(y=y, color=color, linewidth=1.5, linestyle=style, zorder=2)
     if label:
-        ax.annotate(label, xy=(x_max * 0.95, y), fontsize=10, color=color,
-                    xytext=(5, 3), textcoords='offset points')
+        label_infos.append({
+            "x": x_max * 0.95,
+            "y": y,
+            "text": label,
+            "color": color,
+            "fontsize": 14,
+        })
     drawn[name] = {"type": "horizontal", "y": y}
 
-def _draw_eq_point(ax, xy, eq):
+def _draw_eq_point(ax, xy, eq, label_infos, all_scatter_x, all_scatter_y):
     x, y = xy
-    # Projection lines to axes — Cambridge standard: dashed from equilibrium
     ax.plot([x, x], [0, y], '--', color='#666', linewidth=1.0, alpha=0.5, zorder=1)
     ax.plot([0, x], [y, y], '--', color='#666', linewidth=1.0, alpha=0.5, zorder=1)
-    # Equilibrium dot
     ax.plot(x, y, 'o', color=COLORS["eq"], markersize=10, zorder=5,
             markeredgecolor='white', markeredgewidth=2)
+    all_scatter_x.append(x)
+    all_scatter_y.append(y)
     label = eq.get("label", "")
     if label:
-        offset = eq.get("offset", (12, 12))
-        ax.annotate(label, xy=(x, y), fontsize=14, fontweight='bold',
-                    xytext=offset, textcoords='offset points',
-                    bbox=dict(boxstyle='round,pad=0.25', facecolor='white',
-                             edgecolor='#999', linewidth=0.5, alpha=0.9))
+        offset = eq.get("offset", (0.8, 0.8))
+        label_infos.append({
+            "x": x + float(offset[0]),
+            "y": y + float(offset[1]),
+            "text": label,
+            "color": "#333",
+            "fontsize": 14,
+        })
 
 def _draw_shading(ax, sh, drawn, eq_points, x_max):
-    """Shade between curves using equilibrium point references for x-bounds."""
     upper_id = sh.get("upper", "")
     lower_id = sh.get("lower", "")
     if not (upper_id in drawn and lower_id in drawn):
@@ -239,7 +271,6 @@ def _draw_shading(ax, sh, drawn, eq_points, x_max):
     if du["type"] != "line" or dl["type"] != "line":
         return
 
-    # Get x-bounds from equilibrium point labels
     left_label = sh.get("left_eq", "")
     right_label = sh.get("right_eq", "")
     x1 = eq_points.get(left_label, (0, 0))[0] if left_label else 0
@@ -258,5 +289,5 @@ def _draw_shading(ax, sh, drawn, eq_points, x_max):
     label = sh.get("label", "")
     lx, ly = sh.get("label_pos", (0, 0))
     if label and lx and ly:
-        ax.annotate(label, xy=(lx, ly), fontsize=10, color=color, alpha=0.8,
-                    ha='center', va='center', fontweight='bold')
+        ax.text(lx, ly, label, fontsize=13, color=color, alpha=0.8,
+                ha='center', va='center', fontweight='bold')

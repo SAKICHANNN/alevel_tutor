@@ -540,6 +540,8 @@ class Agent:
         if self.status_callback:
             self.status_callback("🎯 正在深度思考...")
 
+        _last_model = MODELS["tutor"].model if "tutor" in MODELS else "unknown"
+
         with console.status("[cyan]思考中...[/cyan]"):
             try:
                 response = self._call_llm(api_messages)
@@ -548,6 +550,7 @@ class Agent:
                 self.conversation.append({"role": "assistant", "content": error_msg})
                 if self.conv_id:
                     save_message(self.conv_id, "assistant", error_msg)
+                _last_response_time = time.time() - t_start
                 return error_msg
 
         msg = response["choices"][0]["message"]
@@ -609,7 +612,7 @@ class Agent:
         # Store raw output before sanitization for debug logging
         _last_raw_output = final_content
         _last_response_time = time.time() - t_start
-        _last_model = MODELS.get("tutor", {}).get("model", "unknown")
+        _last_model = MODELS["tutor"].model if "tutor" in MODELS else "unknown"
         _last_svg_count = final_content.count("data:image/svg+xml;base64,") if final_content else 0
         # W5: Sanitize output — remove self-correction artifacts
         final_content = _sanitize_output(final_content)

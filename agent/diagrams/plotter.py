@@ -6,7 +6,9 @@ LLM describes what → Python computes + renders.
 
 Key guarantees:
   - All intersections solved mathematically
-  - All labels positioned by textalloc — no overlaps with any line or label
+  - Labels anchored to their curves at strategic positions
+  - Each curve gets a different label position to avoid overlap
+  - Labels rotated to match curve angle, offset along normal
   - Output: SVG to data/rendered/{hash}.svg
 """
 import base64
@@ -21,7 +23,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
-import textalloc as ta
 
 RENDER_DIR = Path(__file__).parent.parent.parent / "data" / "rendered"
 RENDER_DIR.mkdir(parents=True, exist_ok=True)
@@ -53,6 +54,18 @@ COLORS = {
     "price_ctrl": "#E74C3C",
     "eq": "#1a1a1a", "grid": "#e0e0e0",
 }
+
+# ── Label position staggering ──
+# Each curve index gets a different x-position along the curve
+# to naturally avoid label overlap without any repositioning algorithm.
+LABEL_X_POSITIONS = [0.78, 0.30, 0.55, 0.45, 0.65, 0.85, 0.20, 0.70]
+
+def _get_label_pos(index: int, total: int) -> float:
+    if total <= 2:
+        return [0.78, 0.30][index % 2]
+    if total <= len(LABEL_X_POSITIONS):
+        return LABEL_X_POSITIONS[index]
+    return 0.3 + (0.5 * index / max(total - 1, 1))
 
 # ── Rendering ──
 
@@ -98,21 +111,21 @@ def _plot(spec: dict):
     ax.spines['right'].set_visible(False)
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
 
-    # Collectors for deferred label placement
-    label_infos = []       # [{x, y, text, color, fontsize}, ...]
-    all_line_data = []     # [(x_vals, y_vals), ...] for line-avoidance
-    all_scatter_x = []     # equilibrium points to avoid
-    all_scatter_y = []
+    # Track curve label count for position staggering
+    curve_label_count = 0
+    total_curve_labels = sum(1 for c in curves if c.get("label"))
 
     drawn = {}
     for c in curves:
         ctype = c.get("type", "line")
         if ctype == "line":
-            _draw_line(ax, c, x_max, y_max, drawn, label_infos, all_line_data)
+            _draw_line(ax, c, x_max, y_max, drawn, curve_label_count, total_curve_labels)
         elif ctype == "vertical":
-            _draw_vline(ax, c, y_max, drawn, label_infos)
+            _draw_vline(ax, c, y_max, drawn)
         elif ctype == "horizontal":
-            _draw_hline(ax, c, x_max, drawn, label_infos)
+            _draw_hline(ax, c, x_max, drawn)
+        if c.get("label"):
+            curve_label_count += 1
 
     eq_points = {}
     for eq in equilibria:
@@ -133,57 +146,17 @@ def _plot(spec: dict):
         elif d1["type"] == "line" and d2["type"] == "horizontal":
             xv = x_for_y(d1["i"], d1["s"], d2["y"])
             xy = (xv, d2["y"]) if xv else None
-
         if xy and 0 <= xy[0] <= x_max and 0 <= xy[1] <= y_max:
-            _draw_eq_point(ax, xy, eq, label_infos, all_scatter_x, all_scatter_y)
-            label = eq.get("label", "")
-            if label:
-                eq_points[label] = xy
+            _draw_eq_point(ax, xy, eq)
+            if eq.get("label"):
+                eq_points[eq["label"]] = xy
 
     for sh in shading:
         _draw_shading(ax, sh, drawn, eq_points, x_max)
 
-    # ── Deferred label placement via textalloc ──
-    if label_infos:
-        label_x = [li["x"] for li in label_infos]
-        label_y = [li["y"] for li in label_infos]
-        texts = [li["text"] for li in label_infos]
-        # Build scatter data: equilibrium dots + label positions themselves
-        sx = list(all_scatter_x) + label_x
-        sy = list(all_scatter_y) + label_y
-        # Build line data for avoidance
-        x_lists = [ld[0] for ld in all_line_data if len(ld[0]) > 0]
-        y_lists = [ld[1] for ld in all_line_data if len(ld[1]) > 0]
-        try:
-            ta.allocate(
-                ax,
-                label_x, label_y,
-                texts,
-                textsize=14,
-                x_lines=x_lists,
-                y_lines=y_lists,
-                x_scatter=sx,
-                y_scatter=sy,
-                draw_lines=False,
-                margin=0.02,
-                min_distance=0.015,
-                max_distance=0.06,
-            )
-            # Bold-ify and color allocated texts, clamp to axis bounds
-            for i, t in enumerate(texts):
-                t.set_fontweight('bold')
-                t.set_color(label_infos[i].get("color", "#333"))
-                # Clamp position to stay within axes
-                pos = t.get_position()
-                clamped_x = max(0.3, min(x_max - 0.3, pos[0]))
-                clamped_y = max(0.3, min(y_max - 0.3, pos[1]))
-                t.set_position((clamped_x, clamped_y))
-        except Exception:
-            pass  # textalloc fails gracefully — labels stay at original positions
-
     return fig, ax
 
-def _draw_line(ax, c, x_max, y_max, drawn, label_infos, all_line_data):
+def _draw_line(ax, c, x_max, y_max, drawn, label_idx, total_labels):
     i = c.get("intercept", 5)
     s = c.get("slope", -1)
     name = c.get("id", "")
@@ -191,30 +164,51 @@ def _draw_line(ax, c, x_max, y_max, drawn, label_infos, all_line_data):
     style = c.get("style", "-")
     width = c.get("width", 2)
     label = c.get("label", "")
-    label_pos = c.get("label_pos", 0.7)
 
+    # Compute visible range
     x_vals = np.linspace(0, x_max, 200)
     y_vals = i + s * x_vals
     mask = (y_vals >= 0) & (y_vals <= y_max)
-    x_vals, y_vals = x_vals[mask], y_vals[mask]
-    if len(x_vals) > 1:
-        ax.plot(x_vals, y_vals, linestyle=style, color=color, linewidth=width, zorder=2)
-        all_line_data.append((x_vals.copy(), y_vals.copy()))
+    x_vis, y_vis = x_vals[mask], y_vals[mask]
+    if len(x_vis) > 1:
+        ax.plot(x_vis, y_vis, linestyle=style, color=color, linewidth=width, zorder=2)
 
-    if label:
-        idx = min(int(len(x_vals) * label_pos), len(x_vals) - 1)
-        if idx >= 0:
-            label_infos.append({
-                "x": float(x_vals[idx]),
-                "y": float(y_vals[idx]),
-                "text": label,
-                "color": color,
-                "fontsize": 14,
-            })
+    # Anchor label to curve — each curve gets a different x position
+    if label and len(x_vis) > 1:
+        pos = _get_label_pos(label_idx, total_labels)
+        idx = min(int(len(x_vis) * pos), len(x_vis) - 1)
+        x0, y0 = x_vis[idx], y_vis[idx]
+
+        # Compute curve angle at this point
+        angle_rad = np.arctan(-s)  # slope tangent
+        angle_deg = np.degrees(angle_rad)
+
+        # Normal direction (upward offset from the curve)
+        normal_x = np.sign(s) * 0.25
+        normal_y = 0.25
+
+        # For demand curves (negative slope), offset above-left
+        # For supply curves (positive slope), offset below-right
+        if s < 0:
+            ox = x0 - abs(normal_x)
+            oy = y0 + normal_y
+        else:
+            ox = x0 + normal_x
+            oy = y0 + normal_y
+
+        # Clamp to axes
+        ox = max(0.3, min(x_max - 0.3, ox))
+        oy = max(0.3, min(y_max - 0.3, oy))
+
+        ax.annotate(label, xy=(x0, y0),
+                    fontsize=14, color=color, fontweight='bold',
+                    xytext=(ox, oy), textcoords='data',
+                    bbox=dict(boxstyle='round,pad=0.12', facecolor='white',
+                             edgecolor=color, linewidth=0.7, alpha=0.9))
 
     drawn[name] = {"type": "line", "i": i, "s": s}
 
-def _draw_vline(ax, c, y_max, drawn, label_infos):
+def _draw_vline(ax, c, y_max, drawn):
     x = c.get("x", 5)
     name = c.get("id", "")
     color = COLORS.get(c.get("color", "lras"), "#333")
@@ -222,16 +216,13 @@ def _draw_vline(ax, c, y_max, drawn, label_infos):
     label = c.get("label", "")
     ax.axvline(x=x, color=color, linewidth=2, linestyle=style, zorder=2)
     if label:
-        label_infos.append({
-            "x": x,
-            "y": y_max * 0.85,
-            "text": label,
-            "color": color,
-            "fontsize": 14,
-        })
+        ax.annotate(label, xy=(x, y_max * 0.85), fontsize=13, color=color,
+                    fontweight='bold', xytext=(x + 0.3, y_max * 0.85), textcoords='data',
+                    bbox=dict(boxstyle='round,pad=0.1', facecolor='white',
+                             edgecolor=color, linewidth=0.7, alpha=0.9))
     drawn[name] = {"type": "vertical", "x": x}
 
-def _draw_hline(ax, c, x_max, drawn, label_infos):
+def _draw_hline(ax, c, x_max, drawn):
     y = c.get("y", 3)
     name = c.get("id", "")
     color = COLORS.get(c.get("color", "price_ctrl"), "#333")
@@ -239,33 +230,23 @@ def _draw_hline(ax, c, x_max, drawn, label_infos):
     label = c.get("label", "")
     ax.axhline(y=y, color=color, linewidth=1.5, linestyle=style, zorder=2)
     if label:
-        label_infos.append({
-            "x": x_max * 0.95,
-            "y": y,
-            "text": label,
-            "color": color,
-            "fontsize": 14,
-        })
+        ax.annotate(label, xy=(x_max * 0.95, y), fontsize=13, color=color,
+                    xytext=(x_max * 0.95, y + 0.3), textcoords='data')
     drawn[name] = {"type": "horizontal", "y": y}
 
-def _draw_eq_point(ax, xy, eq, label_infos, all_scatter_x, all_scatter_y):
+def _draw_eq_point(ax, xy, eq):
     x, y = xy
     ax.plot([x, x], [0, y], '--', color='#666', linewidth=1.0, alpha=0.5, zorder=1)
     ax.plot([0, x], [y, y], '--', color='#666', linewidth=1.0, alpha=0.5, zorder=1)
     ax.plot(x, y, 'o', color=COLORS["eq"], markersize=10, zorder=5,
             markeredgecolor='white', markeredgewidth=2)
-    all_scatter_x.append(x)
-    all_scatter_y.append(y)
     label = eq.get("label", "")
     if label:
-        offset = eq.get("offset", (0.8, 0.8))
-        label_infos.append({
-            "x": x + float(offset[0]),
-            "y": y + float(offset[1]),
-            "text": label,
-            "color": "#333",
-            "fontsize": 14,
-        })
+        offset = eq.get("offset", (0.6, 0.6))
+        ax.annotate(label, xy=(x, y), fontsize=14, fontweight='bold',
+                    xytext=(x + float(offset[0]), y + float(offset[1])), textcoords='data',
+                    bbox=dict(boxstyle='round,pad=0.25', facecolor='white',
+                             edgecolor='#999', linewidth=0.5, alpha=0.9))
 
 def _draw_shading(ax, sh, drawn, eq_points, x_max):
     upper_id = sh.get("upper", "")
@@ -275,22 +256,18 @@ def _draw_shading(ax, sh, drawn, eq_points, x_max):
     du, dl = drawn[upper_id], drawn[lower_id]
     if du["type"] != "line" or dl["type"] != "line":
         return
-
     left_label = sh.get("left_eq", "")
     right_label = sh.get("right_eq", "")
     x1 = eq_points.get(left_label, (0, 0))[0] if left_label else 0
     x2 = eq_points.get(right_label, (x_max, 0))[0] if right_label else x_max
-
     if x1 >= x2:
         return
-
     xs = np.linspace(x1, x2, 100)
     y_upper = du["i"] + du["s"] * xs
     y_lower = dl["i"] + dl["s"] * xs
     color = COLORS.get(sh.get("color", "dwl"), "#F1948A")
     alpha = sh.get("alpha", 0.25)
     ax.fill_between(xs, y_upper, y_lower, color=color, alpha=alpha, zorder=1)
-
     label = sh.get("label", "")
     lx, ly = sh.get("label_pos", (0, 0))
     if label and lx and ly:

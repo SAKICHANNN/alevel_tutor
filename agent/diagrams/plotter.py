@@ -6,11 +6,9 @@ LLM describes what → Python computes + renders.
 
 Key guarantees:
   - All intersections solved mathematically
-  - Curve labels offset perpendicular from line (above/below, never cut)
-  - Each curve label at different x-position to avoid overlap
-  - Equilibrium labels at intersection with small offset + white bbox
+  - Curve labels placed near each curve (above demand, below supply), plain text
+  - Equilibrium labels at intersection with small offset
   - Output: SVG to data/rendered/{hash}.svg
-  - Zero external dependencies beyond matplotlib + numpy
 """
 import base64
 import hashlib
@@ -52,12 +50,13 @@ COLORS = {
     "eq": "#1a1a1a", "grid": "#e0e0e0",
 }
 
+# Staggered x-positions per curve
+LABEL_X = [0.82, 0.30, 0.55, 0.45, 0.68, 0.88, 0.18, 0.72]
 
 
 def _hash_spec(spec: dict) -> str:
     raw = json.dumps(spec, sort_keys=True)
     return hashlib.md5(raw.encode()).hexdigest()[:12]
-
 
 def render_economics(spec: dict) -> Optional[str]:
     spec_hash = _hash_spec(spec)
@@ -81,47 +80,6 @@ def render_economics(spec: dict) -> Optional[str]:
         return None
 
 
-def _curves_endpoints(curves, drawn, x_max, y_max):
-    """Collect the rightmost visible point of each labeled curve for top-right label placement."""
-    endpoints = []
-    for c in curves:
-        name = c.get("id", "")
-        label = c.get("label", "")
-        if not label or name not in drawn:
-            continue
-        d = drawn[name]
-        if d["type"] == "line":
-            # y at right edge of visible range
-            y_at_right = d["i"] + d["s"] * x_max
-            if 0 <= y_at_right <= y_max:
-                endpoints.append((label, y_at_right, COLORS.get(c.get("color", "demand"), "#333")))
-        elif d["type"] == "vertical":
-            endpoints.append((label, y_max * 0.82, COLORS.get(c.get("color", "lras"), "#333")))
-        elif d["type"] == "horizontal":
-            endpoints.append((label, d["y"], COLORS.get(c.get("color", "price_ctrl"), "#333")))
-    # Sort by y: highest curve first (top), lowest last (bottom)
-    endpoints.sort(key=lambda e: -e[1])
-    return endpoints
-
-
-def _place_labels_top_right(ax, endpoints, x_max, y_max):
-    """Stack labels vertically in top-right corner, avoiding all elements."""
-    n = len(endpoints)
-    if n == 0:
-        return
-    start_y = y_max - 0.5
-    gap = min(0.9, (y_max - 1.5) / max(n, 1))
-    for i, (text, _, color) in enumerate(endpoints):
-        lx = x_max - 0.3
-        ly = start_y - i * gap
-        ly = max(0.5, min(y_max - 0.3, ly))
-        ax.annotate(text, xy=(lx, ly), fontsize=14, fontweight='bold',
-                    color=color, ha='right', va='center',
-                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
-                             edgecolor=color, linewidth=1.5, alpha=1.0),
-                    zorder=10)
-
-
 def _plot(spec: dict):
     curves = spec.get("curves", [])
     equilibria = spec.get("equilibria", [])
@@ -140,6 +98,7 @@ def _plot(spec: dict):
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
 
     drawn = {}
+    label_idx = 0
 
     for c in curves:
         ctype = c.get("type", "line")
@@ -147,33 +106,48 @@ def _plot(spec: dict):
         color = COLORS.get(c.get("color", "demand"), "#333")
         style = c.get("style", "-")
         width = c.get("width", 2)
+        label = c.get("label", "")
+        i_val = c.get("intercept", 5)
+        s_val = c.get("slope", -1)
 
         if ctype == "line":
-            i_val = c.get("intercept", 5)
-            s_val = c.get("slope", -1)
             x_vals = np.linspace(0, x_max, 200)
             y_vals = i_val + s_val * x_vals
             mask = (y_vals >= 0) & (y_vals <= y_max)
             x_vis, y_vis = x_vals[mask], y_vals[mask]
             if len(x_vis) > 1:
                 ax.plot(x_vis, y_vis, linestyle=style, color=color, linewidth=width, zorder=2)
+                if label:
+                    xp = c.get("label_pos", LABEL_X[min(label_idx, len(LABEL_X)-1)])
+                    ii = min(int(len(x_vis) * xp), len(x_vis) - 1)
+                    lx, ly = x_vis[ii], y_vis[ii]
+                    # Offset perpendicular: demand slope<0 → above, supply slope>0 → below
+                    off = 0.7
+                    if s_val < 0:
+                        ox, oy = lx - 0.3, ly + off
+                    else:
+                        ox, oy = lx + 0.3, ly - off
+                    ox = max(0.3, min(x_max - 0.3, ox))
+                    oy = max(0.3, min(y_max - 0.3, oy))
+                    ax.annotate(label, xy=(lx, ly), fontsize=14, fontweight='bold',
+                                color=color, xytext=(ox, oy), textcoords='data', zorder=6)
             drawn[name] = {"type": "line", "i": i_val, "s": s_val}
+            label_idx += 1 if label else 0
 
         elif ctype == "vertical":
             x = c.get("x", 5)
             ax.axvline(x=x, color=color, linewidth=2, linestyle=style, zorder=2)
+            if label:
+                ax.text(x + 0.3, y_max * 0.82, label, fontsize=14, fontweight='bold', color=color, zorder=6)
             drawn[name] = {"type": "vertical", "x": x}
 
         elif ctype == "horizontal":
             y = c.get("y", 3)
             ax.axhline(y=y, color=color, linewidth=1.5, linestyle=style, zorder=2)
+            if label:
+                ax.text(x_max * 0.85, y + 0.2, label, fontsize=14, fontweight='bold', color=color, zorder=6)
             drawn[name] = {"type": "horizontal", "y": y}
 
-    # All curve labels stacked in top-right corner
-    endpoints = _curves_endpoints(curves, drawn, x_max, y_max)
-    _place_labels_top_right(ax, endpoints, x_max, y_max)
-
-    # Equilibrium points
     eq_points = {}
     for eq in equilibria:
         c1, c2 = eq.get("c1"), eq.get("c2")
@@ -194,7 +168,7 @@ def _plot(spec: dict):
             xv = x_for_y(d1["i"], d1["s"], d2["y"])
             xy = (xv, d2["y"]) if xv else None
         if xy and 0 <= xy[0] <= x_max and 0 <= xy[1] <= y_max:
-            _draw_eq_point(ax, xy, eq, x_max, y_max)
+            _draw_eq_point(ax, xy, eq)
             if eq.get("label"):
                 eq_points[eq["label"]] = xy
 
@@ -204,7 +178,7 @@ def _plot(spec: dict):
     return fig, ax
 
 
-def _draw_eq_point(ax, xy, eq, x_max, y_max):
+def _draw_eq_point(ax, xy, eq):
     x, y = xy
     ax.plot([x, x], [0, y], '--', color='#666', linewidth=1.0, alpha=0.5, zorder=1)
     ax.plot([0, x], [y, y], '--', color='#666', linewidth=1.0, alpha=0.5, zorder=1)
@@ -214,10 +188,7 @@ def _draw_eq_point(ax, xy, eq, x_max, y_max):
     if label:
         ox = eq.get("offset", (12, 12))
         ax.annotate(label, xy=(x, y), fontsize=14, fontweight='bold',
-                    xytext=(float(ox[0]), float(ox[1])), textcoords='offset points',
-                    bbox=dict(boxstyle='round,pad=0.25', facecolor='white',
-                             edgecolor='#999', linewidth=0.5, alpha=0.95),
-                    zorder=6)
+                    xytext=(float(ox[0]), float(ox[1])), textcoords='offset points', zorder=6)
 
 
 def _draw_shading(ax, sh, drawn, eq_points, x_max):

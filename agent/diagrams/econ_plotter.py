@@ -43,21 +43,21 @@ def solve_x_for_y(intercept, slope, y_target):
 
 # ── Style ──
 STYLE = {
-    "figsize": (8, 6),
-    "dpi": 120,
-    "d_color": "#2B5B84",    # Demand blue
-    "s_color": "#C44E52",    # Supply red
-    "d2_color": "#4C9BCF",   # Demand 2 lighter blue
-    "s2_color": "#E88C8F",   # Supply 2 lighter red
-    "msc_color": "#E67E22",  # MSC orange
-    "msb_color": "#27AE60",  # MSB green
-    "lras_color": "#2C3E50", # LRAS dark
-    "tax_color": "#E74C3C",  # Tax red
-    "sub_color": "#2ECC71",  # Subsidy green
-    "dwl_color": "#F1948A",  # DWL light red
-    "cs_color": "#AED6F1",   # CS light blue
-    "ps_color": "#F5B7B1",   # PS light pink
-    "rev_color": "#F9E79F",  # Tax revenue yellow
+    "figsize": (8.5, 6.5),
+    "dpi": 140,
+    "d_color": "#2B5B84",
+    "s_color": "#C44E52",
+    "d2_color": "#4C9BCF",
+    "s2_color": "#E88C8F",
+    "msc_color": "#E67E22",
+    "msb_color": "#27AE60",
+    "lras_color": "#2C3E50",
+    "tax_color": "#E74C3C",
+    "sub_color": "#2ECC71",
+    "dwl_color": "#F1948A",
+    "cs_color": "#AED6F1",
+    "ps_color": "#F5B7B1",
+    "rev_color": "#F9E79F",
     "eq_color": "#1a1a1a",
     "grid": False,
     "font_family": "DejaVu Sans",
@@ -71,7 +71,7 @@ def render_economics(spec: dict) -> Optional[str]:
         fig, ax = _plot_from_spec(spec)
         buf = io.BytesIO()
         fig.savefig(buf, format='png', dpi=STYLE['dpi'], bbox_inches='tight',
-                    facecolor='white', edgecolor='none')
+                    facecolor='white', edgecolor='none', pad_inches=0.3)
         plt.close(fig)
         buf.seek(0)
         b64 = base64.b64encode(buf.read()).decode('ascii')
@@ -96,8 +96,8 @@ def _plot_from_spec(spec: dict):
     # ── Axes ──
     ax.set_xlim(0, x_max)
     ax.set_ylim(0, y_max)
-    ax.set_xlabel(axes.get("x", "Q"), fontsize=12)
-    ax.set_ylabel(axes.get("y", "P"), fontsize=12)
+    ax.set_xlabel(axes.get("x", "Q"), fontsize=13, labelpad=8)
+    ax.set_ylabel(axes.get("y", "P"), fontsize=13, labelpad=8)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
@@ -179,13 +179,16 @@ def _draw_line(ax, c, x_max, drawn):
     if len(x_vals) > 1:
         ax.plot(x_vals, y_vals, linestyle=style, color=color, linewidth=width, zorder=2)
 
-    # Label
+    # Label — positioned with offset to avoid curve overlap
     if label:
         idx = min(int(len(x_vals) * label_pos), len(x_vals) - 1)
         if idx >= 0:
+            # Use small background box to make label readable
             ax.annotate(label, xy=(x_vals[idx], y_vals[idx]),
-                        fontsize=11, color=color, fontweight='bold',
-                        xytext=(5, 5), textcoords='offset points')
+                        fontsize=10, color=color, fontweight='bold',
+                        xytext=(8, 8), textcoords='offset points',
+                        bbox=dict(boxstyle='round,pad=0.1', facecolor='white',
+                                 edgecolor='none', alpha=0.85))
 
     drawn[name] = {"type": "line", "intercept": intercept, "slope": slope, "color": color}
     return drawn
@@ -216,12 +219,20 @@ def _draw_horizontal(ax, c, x_max):
 
 def _draw_point(ax, xy, pt):
     x, y = xy
-    ax.plot(x, y, 'o', color=STYLE["eq_color"], markersize=6, zorder=5)
+    # Draw projection lines (Cambridge standard)
+    if pt.get("projection", True):
+        ax.plot([x, x], [0, y], '--', color='#999', linewidth=0.8, alpha=0.5, zorder=1)
+        ax.plot([0, x], [y, y], '--', color='#999', linewidth=0.8, alpha=0.5, zorder=1)
+    # Equilibrium dot
+    ax.plot(x, y, 'o', color=STYLE["eq_color"], markersize=7, zorder=5, 
+            markeredgecolor='white', markeredgewidth=1.5)
     label = pt.get("label", "")
     if label:
-        offset = pt.get("offset", (8, 8))
+        offset = pt.get("offset", (10, 10))
         ax.annotate(label, xy=(x, y), fontsize=11, fontweight='bold',
-                    xytext=offset, textcoords='offset points')
+                    xytext=offset, textcoords='offset points',
+                    bbox=dict(boxstyle='round,pad=0.2', facecolor='white', 
+                             edgecolor='none', alpha=0.8))
 
 
 def _draw_area(ax, area, curves, x_max):

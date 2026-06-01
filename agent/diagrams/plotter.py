@@ -173,6 +173,7 @@ def _plot(spec: dict):
             for i, t in enumerate(texts):
                 t.set_fontweight('bold')
                 t.set_color(label_infos[i].get("color", "#333"))
+                t.set_in_layout(False)  # prevent tight bbox from expanding for labels
         except Exception:
             pass  # textalloc fails gracefully — labels stay at original positions
 

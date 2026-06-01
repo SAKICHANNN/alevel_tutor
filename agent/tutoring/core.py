@@ -37,19 +37,30 @@ _SELF_CORRECTION_PATTERNS = [
     r'等等.*?重新.*?算',
 ]
 
+_ASCII_ART_PATTERN = re.compile(r'[┌┐└┘├┤│─┬┴┼╭╮╰╯→←↑↓●○]')
+
+
 def _sanitize_output(content: str) -> str:
-    """Post-process LLM output to flag self-correction artifacts.
-    If detected, prepend a warning for the student."""
+    """Post-process LLM output: flag self-correction and ASCII art."""
     import re
     for pattern in _SELF_CORRECTION_PATTERNS:
         if re.search(pattern, content, re.IGNORECASE):
-            # Mark the output so the student knows to verify
             if "⚠️" not in content[:200]:
                 content = (
                     "⚠️ 此回答可能包含自我修正过程，部分信息请以教材为准。\n"
                     "如有疑问，请追问确认。\n\n" + content
                 )
             break
+
+    # Detect ASCII art diagrams (box-drawing characters used as circuit/flow diagrams)
+    ascii_matches = _ASCII_ART_PATTERN.findall(content)
+    if len(ascii_matches) >= 5 and "```mermaid" not in content:
+        content += (
+            "\n\n---\n"
+            "⚠️ **图表提示**：以上包含 ASCII 字符拼图，可能排版错乱。"
+            "请回复「用 Mermaid 重画」让我重新绘制。"
+        )
+
     return content
 
 # ── Tool Definitions for function calling ──

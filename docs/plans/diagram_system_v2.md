@@ -245,3 +245,128 @@ demo.mount("/diagrams", gr.StaticFiles(directory="data/rendered"))
 - [ ] 多轮对话不受图表影响
 - [ ] 物理/化学/数学图也都通过 Kroki 正常渲染
 - [ ] ASCII 字符图 = 0 出现
+
+---
+
+## 6. 开发流程规范
+
+### 6.1 分支策略
+
+| 阶段 | 分支 | 说明 |
+|------|------|------|
+| Phase 1 | `feat/diagram-plotter` | Python matplotlib 渲染引擎 |
+| Phase 2 | `feat/diagram-llm-int` | LLM 集成 + system prompt 更新 |
+| Phase 3 | `feat/diagram-vlm` | VLM 质量验证 |
+| Phase 4 | `feat/diagram-tests` | 测试套件 |
+| Phase 5 | `feat/diagram-physchem` | 物理/化学扩展 |
+
+每个分支从 `main` 切出，完成后 merge 回 `main`。
+
+### 6.2 Commit 规范
+
+| 时机 | 消息格式 | 示例 |
+|------|---------|------|
+| 每完成一个图类型 | `feat(diagram): demand_supply plotter with intersection solver` | — |
+| 每通过一个 VLM 检查 | `verify(diagram): demand_supply Grade A VLM-confirmed` | — |
+| 每 fix 一个 bug | `fix(diagram): projection lines missing on tax diagram` | — |
+| 每通过一个测试 | `test(diagram): add 5 demand_supply variant test cases` | — |
+| 每完成一个阶段 | `feat(diagram): Phase 1 complete — all 14 econ types` | — |
+
+**规则**：每完成一个最小可验证单元（一个图类型、一个测试、一个 bug fix）立即 commit，不积攒。
+
+### 6.3 Log 规范
+
+**文件**：`docs/log/diagram_v2.md`（新建）
+
+**每次 commit 后记录**：
+- 做了什么
+- 为什么这样做（决策原因）
+- 遇到的问题 + 如何解决的
+- 下一步
+
+**格式**：
+```
+## Phase 1 — 2026-06-02
+
+### commit abc1234: demand_supply plotter
+- 实现：matplotlib 渲染，对称轴标签，投影线
+- 决策：用 scipy.optimize.fsolve 解交点而非代数 —— 因为后续要支持非线性曲线
+- 问题：matplotlib 中文字体缺失 → 回退英文标签
+- 下一步：实现 demand_shift 变体
+```
+
+### 6.4 测试规范
+
+**每个图类型至少 3 个测试用例**：
+
+| 用例 | 目的 |
+|------|------|
+| 完美答案 | 验证基本渲染正确（无错误、有SVG输出） |
+| 参数变化 | 验证弹性/平移/缩放（不同 intercept/slope） |
+| 边界情况 | 验证极端参数（完美弹性/无弹性/零值） |
+
+**测试文件**：`tests/test_diagram_v2.py`
+
+**测试结构**：
+```python
+# 每个图类型一个 test class
+class TestDemandSupply:
+    def test_basic_equilibrium(self): ...
+    def test_elastic_demand(self): ...
+    def test_perfectly_inelastic(self): ...
+
+class TestADAS:
+    def test_basic_ad_as(self): ...
+    def test_demand_pull_inflation(self): ...
+    def test_cost_push_stagflation(self): ...
+```
+
+**每次 Phase 完成后**：
+```bash
+PYTHONPATH=. python3 tests/test_diagram_v2.py
+# 目标：全部 PASS，0 FAIL
+```
+
+### 6.5 Debug 规范
+
+**遇到任何渲染问题时**：
+
+1. **隔离**：用最小 spec 复现问题
+2. **对比**：与 Cambridge 教材/真题对照
+3. **VLM 检查**：`curl` 发送渲染结果给 Qwen VL，问「这张图符合 Cambridge A-Level 标准吗？哪里不对？」
+4. **修复**：改代码 → 重新渲染 → 再 VLM
+5. **记录**：问题 + 根因 + 修复 → `docs/log/diagram_v2.md`
+
+**VLM Debug 命令模板**：
+```bash
+# 1. 生成图
+python3 -c "from agent.diagrams.plotter import render; render('demand_supply', {...})" > /tmp/test.svg
+
+# 2. VLM 检查
+python3 -c "
+import base64, requests
+svg = open('/tmp/test.svg','rb').read()
+b64 = base64.b64encode(svg).decode()
+r = requests.post('http://127.0.0.1:1234/v1/chat/completions', json={
+  'model':'qwen/qwen3-vl-8b',
+  'messages':[{'role':'user','content':[
+    {'type':'text','text':'Grade this Cambridge A-Level diagram. Check axes, curves, labels, intersections. Output JSON: {pass:bool, grade:A/B/C/F, issues:[], summary:str}'},
+    {'type':'image_url','image_url':{'url':f'data:image/svg+xml;base64,{b64}'}}
+  ]}],
+  'temperature':0.1, 'max_tokens':300
+}, timeout=120)
+print(r.json()['choices'][0]['message']['content'])
+"
+```
+
+### 6.6 回滚保护
+
+**每个 Phase 开始前**：
+```bash
+git branch backup-$(date +%Y%m%d-%H%M)  # 创建时间戳备份
+```
+
+**每个 Phase 完成后**：
+```bash
+git tag phase-1-complete  # 打标签，方便快速回退
+```

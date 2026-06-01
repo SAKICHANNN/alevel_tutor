@@ -560,8 +560,7 @@ class Agent:
         # Preserve reasoning_content for API continuity
         reasoning_content = msg.get("reasoning_content", "")
 
-        max_tool_rounds = 3
-        for _ in range(max_tool_rounds):
+        for _ in range(6):
             if msg.get("tool_calls"):
                 api_messages.append(msg)
                 if self.conv_id:

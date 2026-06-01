@@ -49,6 +49,9 @@ _last_katex_fixes: dict = {"currency": 0, "stray_dollar": 0, "ampersand": 0, "ce
 _last_raw_output: str = ""
 _last_tool_calls: list = []
 _last_response_time: float = 0.0
+_last_model: str = ""
+_last_svg_count: int = 0
+_last_conv_len: int = 0
 
 
 def _fix_katex(content: str) -> str:
@@ -469,10 +472,13 @@ class Agent:
 
     def chat(self, user_input: str, image_path: Optional[str] = None) -> str:
         """Process a chat message with optional image."""
-        global _last_raw_output, _last_tool_calls, _last_response_time
+        global _last_raw_output, _last_tool_calls, _last_response_time, _last_model, _last_svg_count, _last_conv_len
         _last_raw_output = ""
         _last_tool_calls = []
         _last_response_time = 0.0
+        _last_model = ""
+        _last_svg_count = 0
+        _last_conv_len = len(self.conversation)
 
         t_start = time.time()
         # W5: Prompt injection guard — check before processing
@@ -597,6 +603,8 @@ class Agent:
         # Store raw output before sanitization for debug logging
         _last_raw_output = final_content
         _last_response_time = time.time() - t_start
+        _last_model = MODELS.get("tutor", {}).get("model", "unknown")
+        _last_svg_count = final_content.count("data:image/svg+xml;base64,") if final_content else 0
         # W5: Sanitize output — remove self-correction artifacts
         final_content = _sanitize_output(final_content)
         assistant_msg = {"role": "assistant", "content": final_content}

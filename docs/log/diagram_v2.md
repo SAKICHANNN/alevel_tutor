@@ -49,14 +49,14 @@
 - 新增 `agent/diagrams/spec_builder.py`：LLM 只填类型+参数，Python 计算交点/斜率
 - 模式：`{"type": "demand_supply", "elasticity": "elastic"}` → builder 计算完整 spec → plotter 渲染
 - 14 种经济图类型支持
-- 48 项图表测试全部通过，VLM 验证 Grade A on 2/3 类型
+- 35 项图表测试全部通过（test_diagram_v2.py），VLM 验证 Grade A on 2/3 类型
 
 ### commit 59ab005: shading uses equilibrium labels
 - 填色区域改用 Pe/Qe 标签代替手动 x1/x2 坐标
 - 避免 LLM 猜测网格坐标导致填色错位
 
-### commit d08a56d: 48 diagram tests
-- 48 项图表测试全部通过
+### commit d08a56d: 35 diagram tests
+- 35 项图表测试全部通过（test_diagram_v2.py）
 - VLM 验证：Grade A on 2/3 diagram types
 
 ### commit 1c1664c: max_tokens 4096→8192

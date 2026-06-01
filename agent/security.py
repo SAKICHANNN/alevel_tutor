@@ -125,7 +125,7 @@ def detect_injection(text: str) -> Tuple[bool, str]:
     text_lower = text.lower()
 
     for pattern in PROHIBITED_INSTRUCTIONS:
-        if re.search(pattern, text_lower, re.IGNORECASE):
+        if re.search(pattern, text_lower, re.IGNORECASE | re.DOTALL):
             return True, f"检测到潜在注入模式: {pattern}"
 
     # Check for encoded/system-like overrides

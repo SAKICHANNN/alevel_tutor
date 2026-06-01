@@ -6,10 +6,11 @@ LLM describes what → Python computes + renders.
 
 Key guarantees:
   - All intersections solved mathematically
-  - Labels placed IN NaN-cut gaps in the line — NEVER covers curves
-  - Each curve label staggered to avoid overlapping gaps crossing other curves
-  - Equilibrium labels at intersection with small offset + white background
+  - Curve labels offset perpendicular from line (above/below, never cut)
+  - Each curve label at different x-position to avoid overlap
+  - Equilibrium labels at intersection with small offset + white bbox
   - Output: SVG to data/rendered/{hash}.svg
+  - Zero external dependencies beyond matplotlib + numpy
 """
 import base64
 import hashlib
@@ -51,15 +52,14 @@ COLORS = {
     "eq": "#1a1a1a", "grid": "#e0e0e0",
 }
 
-# Staggered x positions for curve labels — each curve gets a different spot
-# to naturally avoid label-label overlap and gap-other_curve crossing
+# Staggered x positions — each curve label at a different spot
 LABEL_X_POSITIONS = [0.82, 0.25, 0.55, 0.45, 0.68, 0.88, 0.18, 0.72]
 
-# ── Rendering ──
 
 def _hash_spec(spec: dict) -> str:
     raw = json.dumps(spec, sort_keys=True)
     return hashlib.md5(raw.encode()).hexdigest()[:12]
+
 
 def render_economics(spec: dict) -> Optional[str]:
     spec_hash = _hash_spec(spec)
@@ -82,28 +82,32 @@ def render_economics(spec: dict) -> Optional[str]:
         import traceback; traceback.print_exc()
         return None
 
-def _place_label_in_gap(ax, x_vals, y_vals, label, label_x_pos, color, fontsize=14):
-    """Draw text in a NaN-gap cut into the line. Returns (x_with_gap, y_with_gap)."""
-    if len(x_vals) < 6:
-        return x_vals, y_vals  # too short to cut
 
-    total = len(x_vals)
-    center = int(total * label_x_pos)
-    half = max(2, total // 40)  # ~2.5% gap
-    lo = max(1, center - half)
-    hi = min(total - 2, center + half)
+def _label_offset_above_below(slope: float, x0: float, y0: float, x_max: float, y_max: float):
+    """
+    Place label perpendicular to the curve, offset to the 'outside'.
+    Demand (negative slope): offset above-left (text to upper-left of curve)
+    Supply (positive slope): offset below-right (text to lower-right of curve)
+    """
+    # Perpendicular unit vector (normal to the line, rotated 90° CCW)
+    # Line direction: (1, slope). Normal: (-slope, 1) / sqrt(slope² + 1)
+    mag = np.sqrt(slope**2 + 1)
+    nx, ny = -slope / mag, 1 / mag
 
-    # Insert NaN to break the line
-    x_gap = np.concatenate([x_vals[:lo], [np.nan], x_vals[hi:]])
-    y_gap = np.concatenate([y_vals[:lo], [np.nan], y_vals[hi:]])
+    # For demand (s < 0): normal points up-right, label goes above curve
+    # For supply (s > 0): normal points down-right, label goes below curve
+    # Scale offset to ~5% of plot size
+    offset = 0.3 * min(x_max, y_max) / 10
+    if slope < 0:
+        ox = x0 - abs(nx) * offset * 2
+        oy = y0 + ny * offset
+    else:
+        ox = x0 + nx * offset * 2
+        oy = y0 - abs(ny) * offset
 
-    # Place label in the gap
-    lx = x_vals[center]
-    ly = y_vals[center]
-    ax.text(lx, ly, label, fontsize=fontsize, fontweight='bold',
-            color=color, ha='center', va='center', zorder=6)
-
-    return x_gap, y_gap
+    ox = max(0.2, min(x_max - 0.2, ox))
+    oy = max(0.2, min(y_max - 0.2, oy))
+    return ox, oy
 
 
 def _plot(spec: dict):
@@ -143,16 +147,26 @@ def _plot(spec: dict):
             x_vis, y_vis = x_vals[mask], y_vals[mask]
 
             if len(x_vis) > 1:
+                # Draw continuous line — never cut
+                ax.plot(x_vis, y_vis, linestyle=style, color=color, linewidth=width, zorder=2)
+
                 if label:
                     x_pos = c.get("label_pos", None)
                     if x_pos is None:
                         x_pos = LABEL_X_POSITIONS[min(label_idx, len(LABEL_X_POSITIONS) - 1)]
                         label_idx += 1
-                    x_plot, y_plot = _place_label_in_gap(ax, x_vis, y_vis, label, x_pos, color)
-                else:
-                    x_plot, y_plot = x_vis, y_vis
+                    center = int(len(x_vis) * x_pos)
+                    center = max(0, min(len(x_vis) - 1, center))
+                    lx, ly = x_vis[center], y_vis[center]
 
-                ax.plot(x_plot, y_plot, linestyle=style, color=color, linewidth=width, zorder=2)
+                    # Offset above (demand) or below (supply), perpendicular to line
+                    ox, oy = _label_offset_above_below(s_val, lx, ly, x_max, y_max)
+
+                    ax.annotate(label, xy=(lx, ly), fontsize=14, fontweight='bold',
+                                color=color, xytext=(ox, oy), textcoords='data',
+                                bbox=dict(boxstyle='round,pad=0.15', facecolor='white',
+                                         edgecolor='none', alpha=0.85),
+                                zorder=6)
 
             drawn[name] = {"type": "line", "i": i_val, "s": s_val}
 
@@ -172,7 +186,7 @@ def _plot(spec: dict):
                         color=color, zorder=6)
             drawn[name] = {"type": "horizontal", "y": y}
 
-    # Equilibrium points — anchored with small offset
+    # Equilibrium points
     eq_points = {}
     for eq in equilibria:
         c1, c2 = eq.get("c1"), eq.get("c2")

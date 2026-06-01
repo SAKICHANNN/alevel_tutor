@@ -169,11 +169,15 @@ def _plot(spec: dict):
                 min_distance=0.015,
                 max_distance=0.06,
             )
-            # Bold-ify the allocated texts and set per-label color
+            # Bold-ify and color allocated texts, clamp to axis bounds
             for i, t in enumerate(texts):
                 t.set_fontweight('bold')
                 t.set_color(label_infos[i].get("color", "#333"))
-                t.set_in_layout(False)  # prevent tight bbox from expanding for labels
+                # Clamp position to stay within axes
+                pos = t.get_position()
+                clamped_x = max(0.3, min(x_max - 0.3, pos[0]))
+                clamped_y = max(0.3, min(y_max - 0.3, pos[1]))
+                t.set_position((clamped_x, clamped_y))
         except Exception:
             pass  # textalloc fails gracefully — labels stay at original positions
 

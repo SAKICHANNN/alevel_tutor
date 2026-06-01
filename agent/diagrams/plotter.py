@@ -82,14 +82,19 @@ def render_economics(spec: dict) -> Optional[str]:
         # Save full-quality SVG to disk
         fig.savefig(str(out_path), format='svg', bbox_inches='tight',
                     facecolor='white', edgecolor='none', pad_inches=0.2)
-        # Also generate compact PNG for inline display
+        # Generate compact SVG for inline display
         buf = io.BytesIO()
-        fig.savefig(buf, format='png', dpi=100, bbox_inches='tight',
+        fig.savefig(buf, format='svg', bbox_inches='tight',
                     facecolor='white', edgecolor='none', pad_inches=0.15)
         plt.close(fig)
         buf.seek(0)
-        b64 = base64.b64encode(buf.read()).decode('ascii')
-        return f"data:image/png;base64,{b64}"
+        svg_raw = buf.read().decode('utf-8')
+        # Strip matplotlib metadata
+        import re as _re3
+        svg_clean = _re3.sub(r'<metadata>.*?</metadata>', '', svg_raw, flags=_re3.DOTALL)
+        svg_clean = _re3.sub(r'<clipPath[^>]*>.*?</clipPath>', '', svg_clean, flags=_re3.DOTALL)
+        b64 = base64.b64encode(svg_clean.encode('utf-8')).decode('ascii')
+        return f"data:image/svg+xml;base64,{b64}"
     except Exception as e:
         print(f"Render error: {e}")
         return None
@@ -102,11 +107,11 @@ def _plot(spec: dict):
     x_max = spec.get("x_max", 10)
     y_max = spec.get("y_max", 10)
 
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = plt.subplots(figsize=(8, 6))
     ax.set_xlim(0, x_max)
     ax.set_ylim(0, y_max)
-    ax.set_xlabel(axes.get("x", "Quantity"), fontsize=16, fontweight='bold', labelpad=12)
-    ax.set_ylabel(axes.get("y", "Price"), fontsize=16, fontweight='bold', labelpad=12)
+    ax.set_xlabel(axes.get("x", "Quantity"), fontsize=14, fontweight='bold', labelpad=10)
+    ax.set_ylabel(axes.get("y", "Price"), fontsize=14, fontweight='bold', labelpad=10)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
@@ -177,10 +182,10 @@ def _draw_line(ax, c, x_max, y_max, drawn):
         idx = min(int(len(x_vals) * label_pos), len(x_vals) - 1)
         if idx >= 0:
             ax.annotate(label, xy=(x_vals[idx], y_vals[idx]),
-                        fontsize=13, color=color, fontweight='bold',
-                        xytext=(8, 8), textcoords='offset points',
-                        bbox=dict(boxstyle='round,pad=0.15', facecolor='white',
-                                 edgecolor=color, linewidth=0.8, alpha=0.9))
+                        fontsize=11, color=color, fontweight='bold',
+                        xytext=(6, 6), textcoords='offset points',
+                        bbox=dict(boxstyle='round,pad=0.12', facecolor='white',
+                                 edgecolor=color, linewidth=0.7, alpha=0.9))
 
     drawn[name] = {"type": "line", "i": i, "s": s}
 

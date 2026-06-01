@@ -26,7 +26,7 @@ def render_and_check(spec, name):
     """Render a spec and verify output is valid."""
     uri = render_economics(spec)
     assert uri is not None, f"{name}: render returned None"
-    assert "data:image/png" in uri, f"{name}: no PNG in output"
+    assert "data:image/" in uri, f"{name}: no PNG in output"
     assert len(uri) > 500, f"{name}: output too short ({len(uri)} chars)"
     STATS["generated"] += 1
     STATS["total_kb"] += len(uri) / 1024

@@ -4,7 +4,6 @@ SQLite database for conversation persistence, grading records, error logging, an
 Architecture:
   - WAL mode + busy_timeout for safe concurrent access
   - All writes go through a single threading.Lock queue
-  - Batch writes for cost_logs and error_logs (collected in memory, flushed periodically)
   - 6 tables: users, conversations, messages, grading_results, error_logs, cost_logs
   - Single user (desktop app pilot), auto-creates on first use
 """
@@ -12,8 +11,7 @@ import json
 import os
 import sqlite3
 import threading
-import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -25,13 +23,6 @@ DB_PATH = DATA_DIR / "tutor.db"
 _conn: Optional[sqlite3.Connection] = None
 _lock = threading.Lock()
 _initialized = False
-
-# In-memory buffers for batch writes
-_cost_buffer: list = []
-_cost_buffer_lock = threading.Lock()
-
-_error_buffer: list = []
-_error_buffer_lock = threading.Lock()
 
 
 def _get_conn() -> sqlite3.Connection:
@@ -152,10 +143,11 @@ def _migrate():
         CREATE INDEX IF NOT EXISTS idx_cost_model ON cost_logs(model_key, created_at);
         """)
         conn.commit()
-    return _ensure_user(conn)
+    _ensure_user()
 
 
-def _ensure_user(conn):
+def _ensure_user():
+    conn = _get_conn()
     with _lock:
         conn.execute("INSERT OR IGNORE INTO users (id, username) VALUES (1, 'local_user')")
         conn.commit()
@@ -188,7 +180,7 @@ def update_conversation(conv_id: int, **kwargs):
     updates = {k: v for k, v in kwargs.items() if k in allowed}
     if not updates:
         return
-    updates["updated_at"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    updates["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     set_clause = ", ".join(f"{k} = ?" for k in updates)
     values = list(updates.values()) + [conv_id]
     conn = _get_conn()
@@ -366,13 +358,10 @@ def log_cost(model_key: str, model_name: str,
              latency_ms: int = 0,
              conversation_id: Optional[int] = None,
              message_id: Optional[int] = None):
-    total = prompt_tokens + completion_tokens + reasoning_tokens
+    total = prompt_tokens + completion_tokens  # completion_tokens already includes reasoning
     pricing = PRICING.get(model_name, {"prompt": 0.14, "completion": 0.28})
     cost_usd = (prompt_tokens / 1_000_000 * pricing["prompt"] +
                 completion_tokens / 1_000_000 * pricing["completion"])
-    # Reasoning tokens count as completion for pricing
-    if reasoning_tokens:
-        cost_usd += reasoning_tokens / 1_000_000 * pricing.get("reasoning", pricing["completion"])
     cost_cny = round(cost_usd * USD_TO_CNY, 4)
     cost_usd = round(cost_usd, 6)
 
@@ -437,7 +426,8 @@ DEFAULT_DAILY_BUDGET_CNY = float(os.getenv("BUDGET_DAILY_CNY", "2"))
 def check_budget() -> tuple[bool, str]:
     """Check if we're within budget. Returns (ok, reason)."""
     monthly = get_total_cost(days=30)
-    daily = get_total_cost(days=1)
+    # Daily budget: use today's date, not past 24 hours
+    daily = _get_today_cost()
 
     monthly_cost = monthly.get("cost_cny", 0) or 0
     daily_cost = daily.get("cost_cny", 0) or 0
@@ -453,6 +443,15 @@ def check_budget() -> tuple[bool, str]:
             f"请明天再试。"
         )
     return True, f"预算正常: 月 ¥{monthly_cost:.2f}/{DEFAULT_MONTHLY_BUDGET_CNY:.0f}, 日 ¥{daily_cost:.2f}/{DEFAULT_DAILY_BUDGET_CNY:.0f}"
+
+
+def _get_today_cost() -> dict:
+    conn = _get_conn()
+    row = conn.execute(
+        """SELECT COALESCE(SUM(estimated_cost_cny),0) as cost_cny
+           FROM cost_logs WHERE date(created_at) = date('now')"""
+    ).fetchone()
+    return dict(row) if row else {}
 
 
 # ═══════════════════════════════════════════════════════════

@@ -14,6 +14,7 @@ Supported engines (via https://kroki.io):
 All engines return SVG, converted to base64 data URI for markdown embedding.
 """
 import base64
+import json
 import re
 import time
 from pathlib import Path
@@ -238,8 +239,27 @@ def extract_and_render_vegalite(content: str) -> str:
     return pattern.sub(_replace, content)
 
 
+def extract_and_render_plot(content: str) -> str:
+    """Find ```plot blocks → render via matplotlib → compact base64 PNG."""
+    pattern = re.compile(r'```plot\s*\n(.*?)```', re.DOTALL)
+
+    def _replace(match):
+        try:
+            spec = json.loads(match.group(1).strip())
+            from agent.diagrams.plotter import render_economics
+            uri = render_economics(spec)
+            if uri:
+                return f'\n\n![diagram]({uri})\n\n'
+        except (json.JSONDecodeError, Exception):
+            pass
+        return match.group(0)
+
+    return pattern.sub(_replace, content)
+
+
 def render_all_diagrams(content: str) -> str:
-    """Post-process LLM output: render all diagram code blocks to SVG images."""
+    """Post-process LLM output: render all diagram code blocks to images."""
+    content = extract_and_render_plot(content)
     content = extract_and_render_mermaid(content)
     content = extract_and_render_tikz(content)
     content = extract_and_render_vegalite(content)

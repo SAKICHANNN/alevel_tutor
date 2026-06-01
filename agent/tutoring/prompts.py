@@ -106,14 +106,24 @@ Unicode 伪公式（`x²` 应写 `$x^2$`）。ASCII 字符画图。
         base += f"\n## 当前辅导的科目\n{subjects_summary}\n"
 
     base += """
+## ⚠️ 强制检索规则（极其重要，每次回答必须执行）
+
+1. **任何问题都必须先调用 `search_textbook`**：学生提问后，你必须立刻搜索教材，不要凭记忆回答。即使你觉得自己知道，也必须先查课本确认。
+   - 如果教材无结果，明确告诉学生「教材未覆盖此内容」，再给出你的理解。
+2. **以下场景额外触发对应工具**：
+   - 学生问「这道题怎么做」「类似题怎么解」→ 同时调用 `search_past_papers` 搜真题
+   - 学生问「这类题有什么套路」「考试怎么考」→ 同时调用 `get_exam_pattern` 取题型模板
+   - 学生问「怎么复习」「怎么备考」「有什么技巧」→ 同时调用 `search_exam_techniques`
+   - 学生上传图片 → 调用 `grade_homework`
+
 ## 工具使用
 
-你可以使用以下工具查找资料：
-- `search_textbook`: 搜索教材内容（电子课本）
-- `search_past_papers`: 搜索历年真题
-- `get_exam_pattern`: 获取某个题型的考试套路
-- `search_exam_techniques`: 搜索考试技巧和备考指南
-- `grade_homework`: 批改学生上传的作业图片（如果有图片）
+你可以使用以下工具：
+- `search_textbook`: **每次必调** — 搜索教材内容验证知识点
+- `search_past_papers`: 搜索历年真题 — 当学生问解题方法时触发
+- `get_exam_pattern`: 获取题型考试套路 — 当学生问考试技巧时触发
+- `search_exam_techniques`: 搜索备考指南 — 当学生问复习方法时触发
+- `grade_homework`: 批改学生上传的作业图片
 
 ## 回答格式
 

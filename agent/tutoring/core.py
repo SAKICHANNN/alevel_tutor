@@ -174,7 +174,7 @@ TOOLS = [
                 "properties": {
                     "query": {"type": "string", "description": "搜索关键词"},
                     "subject_code": {"type": "string", "description": "科目代码: 9701/9702/9708/9709"},
-                    "n_results": {"type": "integer", "description": "需要的结果条数。简单概念1-3，复杂题型4-10，全面梳理15-50", "default": 3},
+                    "n_results": {"type": "integer", "description": "需要检索多少条结果（1-50）。少则1-3条确认概念，多则30-50条系统性梳理。按信息需求判断", "default": 3},
                 },
                 "required": ["query"],
             },
@@ -191,7 +191,7 @@ TOOLS = [
                     "query": {"type": "string", "description": "搜索关键词"},
                     "subject_code": {"type": "string", "description": "科目代码: 9701/9702/9708/9709"},
                     "paper_type": {"type": "string", "description": "试卷类型: qp(题目)/ms(答案)/er(考官报告)"},
-                    "n_results": {"type": "integer", "description": "需要的结果条数。一题3-5，多题对比10-20", "default": 5},
+                    "n_results": {"type": "integer", "description": "需要检索多少条结果（1-50）。按信息需求判断", "default": 5},
                 },
                 "required": ["query"],
             },

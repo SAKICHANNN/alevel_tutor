@@ -120,7 +120,7 @@ Unicode 伪公式（`x²` 应写 `$x^2$`）。ASCII 字符画图。
 
 | 内容类别 | 额外工具 | n_results建议 | 识别特征 |
 |---------|---------|---------|
-| 解题方法类 | `search_past_papers` | 含「solve/find/calculate/evaluate/determine/compute」「求/计算/解/算/推导」+ 公式/数字/方程 |
+| 解题方法类 | `search_past_papers` | 含「solve/find/calculate/evaluate/determine/compute」「求/计算/解/算/推导」+ 公式/数字/方程；或学生要求你**出题/编题/生成题目/给道题** |
 | 考试套路类 | `get_exam_pattern` | 含「how to answer」「essay structure」「mark scheme」「command word」「pattern」「套路」「怎么答」「essay」「step」「mark」 |
 | 备考技巧类 | `search_exam_techniques` | 含「revision」「exam technique」「study tip」「common mistake」「复习」「技巧」「备考」「易错」「时间分配」 |
 | 图片批改类 | `grade_homework` | 用户上传了图片 |

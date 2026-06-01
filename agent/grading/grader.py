@@ -18,19 +18,30 @@ Why two-stage (not one-stage):
 import json
 import re
 import time
-import traceback
 from typing import Optional
 
 from rich.console import Console
 
 from agent.config import MODELS
-from agent.database import log_error, save_grading_result
+from agent.database import log_error, save_grading_result, check_budget
 
 console = Console()
 
 # ── Stage 1 Prompt: Regenerate Expected Solution ──
 
-STAGE1_REGENERATE_PROMPT = """You are a Cambridge A-Level Mathematics examiner. Solve the following problem step by step. You do NOT see the student's answer yet — this is just you solving the problem independently.
+SUBJECT_NAMES = {
+    "9701": "Chemistry",
+    "9702": "Physics",
+    "9708": "Economics",
+    "9709": "Mathematics",
+}
+
+
+def _subject_name(code: Optional[str]) -> str:
+    return SUBJECT_NAMES.get(code or "9709", "Mathematics")
+
+
+STAGE1_REGENERATE_PROMPT = """You are a Cambridge A-Level {subject} examiner. Solve the following problem step by step. You do NOT see the student's answer yet — this is just you solving the problem independently.
 
 ## Step 1: List the mathematical concepts involved (Remember level)
 - What topics/skills does this problem test?
@@ -61,7 +72,7 @@ Problem: {question}
 
 # ── Stage 2 Prompt: Extract-Compare-Grade ──
 
-STAGE2_GRADE_PROMPT = """You are a Cambridge A-Level Mathematics examiner. You now grade the student's answer against the expected solution generated earlier.
+STAGE2_GRADE_PROMPT = """You are a Cambridge A-Level {subject} examiner. You now grade the student's answer against the expected solution generated earlier.
 
 ## Expected Solution & Mark Allocation
 {expected_solution}
@@ -194,7 +205,7 @@ def grade(question: str, student_answer: str,
 
     if matched_ms:
         # ── Direct grading with matched mark scheme ──
-        prompt = _build_direct_grade_prompt(question, matched_ms, student_answer)
+        prompt = _build_direct_grade_prompt(question, matched_ms, student_answer, subject_code)
         try:
             resp_raw = _call_api(config, prompt, temperature=0.3, max_tokens=2048)
             result = _parse_grading_response(resp_raw)
@@ -210,7 +221,10 @@ def grade(question: str, student_answer: str,
             console.print(f"[yellow]Direct grading failed, falling back to PedCoT: {e}[/yellow]")
 
     # ── PedCoT: Stage 1 — Regenerate Expected Solution ──
-    stage1_prompt = STAGE1_REGENERATE_PROMPT.format(question=question)
+    stage1_prompt = STAGE1_REGENERATE_PROMPT.format(
+        subject=_subject_name(subject_code),
+        question=question,
+    )
     try:
         expected_solution = _call_api(config, stage1_prompt, temperature=0.3, max_tokens=2048)
         # Extract mark allocation from Stage-1 output to determine total_marks
@@ -224,6 +238,7 @@ def grade(question: str, student_answer: str,
 
     # ── PedCoT: Stage 2 — Extract-Compare-Grade ──
     stage2_prompt = STAGE2_GRADE_PROMPT.format(
+        subject=_subject_name(subject_code),
         expected_solution=expected_solution,
         student_answer=student_answer,
     )
@@ -246,8 +261,10 @@ def grade(question: str, student_answer: str,
         return _fallback_result(total_marks)
 
 
-def _build_direct_grade_prompt(question: str, mark_scheme: str, student_answer: str) -> str:
-    return f"""You are a Cambridge A-Level Mathematics examiner. Grade this student's answer against the EXACT mark scheme provided below.
+def _build_direct_grade_prompt(question: str, mark_scheme: str, student_answer: str,
+                              subject_code: Optional[str] = None) -> str:
+    subj = _subject_name(subject_code)
+    return f"""You are a Cambridge A-Level {subj} examiner. Grade this student's answer against the EXACT mark scheme provided below.
 
 ## Cambridge M-A-B Marking Rules
 - M marks: Award for valid method applied (not lost for arithmetic slips)
@@ -272,7 +289,12 @@ Return JSON with: score_awarded, score_max, confidence, verdict (Chinese), rubri
 
 def _call_api(config, prompt: str, temperature: float, max_tokens: int) -> str:
     import requests
-    import os
+
+    # BudgetGuard check
+    ok, budget_msg = check_budget()
+    if not ok:
+        raise RuntimeError(f"预算限制: {budget_msg}")
+
     headers = {
         "Authorization": f"Bearer {config.api_key}",
         "Content-Type": "application/json",
@@ -280,7 +302,7 @@ def _call_api(config, prompt: str, temperature: float, max_tokens: int) -> str:
     payload = {
         "model": config.model,
         "messages": [
-            {"role": "system", "content": "You are a Cambridge A-Level Mathematics examiner. "
+            {"role": "system", "content": "You are a Cambridge A-Level examiner. "
              "Answer concisely and accurately. Follow the format instructions exactly."},
             {"role": "user", "content": prompt},
         ],
@@ -297,7 +319,6 @@ def _call_api(config, prompt: str, temperature: float, max_tokens: int) -> str:
     resp.raise_for_status()
     data = resp.json()
     latency_ms = int((time.time() - t0) * 1000)
-    # Log cost
     usage = data.get("usage", {})
     if usage:
         from agent.database import log_cost
@@ -306,6 +327,7 @@ def _call_api(config, prompt: str, temperature: float, max_tokens: int) -> str:
             model_name=config.model,
             prompt_tokens=usage.get("prompt_tokens", 0),
             completion_tokens=usage.get("completion_tokens", 0),
+            reasoning_tokens=usage.get("completion_tokens_details", {}).get("reasoning_tokens", 0),
             latency_ms=latency_ms,
         )
     return data["choices"][0]["message"]["content"]
@@ -316,8 +338,8 @@ def _parse_grading_response(content: str) -> dict:
     try:
         result = json.loads(content)
     except json.JSONDecodeError:
-        # Try to find JSON block
-        match = re.search(r'\{[\s\S]*\}', content)
+        # Try to find first complete JSON object (non-greedy)
+        match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content)
         if match:
             try:
                 result = json.loads(match.group())

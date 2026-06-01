@@ -319,20 +319,23 @@ def build_ui():
         gr.HTML("""
         <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
         <script>
-        mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
-        function scanMermaid() {
-            document.querySelectorAll('code.language-mermaid').forEach(function(code) {
-                var pre = code.closest('pre');
-                if (pre && !pre.dataset.md) {
-                    pre.dataset.md = '1';
-                    pre.classList.add('mermaid');
-                    pre.textContent = code.textContent;
-                    try { mermaid.run({ nodes: [pre] }); } catch(e) {}
-                }
-            });
-        }
-        setInterval(scanMermaid, 1000);
-        new MutationObserver(scanMermaid).observe(document.body, {childList:true, subtree:true, characterData:true});
+        (function() {
+            if (window.__md) return; window.__md = 1;
+            mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+            function scan() {
+                document.querySelectorAll('code.language-mermaid').forEach(function(c) {
+                    var p = c.parentElement;
+                    if (p && p.tagName === 'PRE' && !p.dataset.md) {
+                        p.dataset.md = '1';
+                        p.classList.add('mermaid');
+                        p.textContent = c.textContent;
+                        try { mermaid.run({ nodes: [p] }); } catch(e) { console.error(e); }
+                    }
+                });
+            }
+            setInterval(scan, 800);
+            new MutationObserver(scan).observe(document.body, {childList:true, subtree:true, characterData:true});
+        })();
         </script>
         <style>
         pre.mermaid { background:#fafafa; border-radius:8px; padding:12px; text-align:center; }

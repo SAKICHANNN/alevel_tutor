@@ -135,7 +135,7 @@ TOOLS = [
 
 
 class Agent:
-    def __init__(self, subjects: list = None, conv_id: int = None):
+    def __init__(self, subjects: list = None, conv_id: int = None, status_callback=None):
         self.subjects = subjects or SUBJECTS
         self._subjects_summary = " · ".join(
             f"{s.code} {s.name}" for s in self.subjects
@@ -145,7 +145,8 @@ class Agent:
         ]
         self.current_subject = None
         self._pending_image = None
-        self.conv_id = conv_id  # SQLite conversation ID for persistence
+        self.conv_id = conv_id
+        self.status_callback = status_callback  # fn(str) called on tool/thinking events
 
     def _call_llm(self, messages: list, model_key: str = "tutor", max_retries: int = 2,
                   tools_list: list = TOOLS) -> dict:
@@ -237,12 +238,23 @@ class Agent:
 
     def _execute_tool(self, tool_name: str, arguments: dict) -> str:
         """Execute a tool call and return the result as a string."""
-        # W5: Validate tool call is from allowed set
         valid, reason = validate_tool_call(tool_name, arguments)
         if not valid:
             log_error("tool_fail", f"core.py:_execute_tool({tool_name})",
                       f"Blocked: {reason}", self.conv_id, self.current_subject)
             return f"工具调用被安全策略拦截: {reason}"
+
+        # W5: Status callback for Web UI animations
+        TOOL_STATUS = {
+            "search_textbook": "📚 正在检索教材...",
+            "search_past_paper": "📝 正在检索真题...",
+            "get_exam_pattern": "🎯 正在分析解题套路...",
+            "search_exam_techniques": "💡 正在查找答题技巧...",
+            "grade_homework_image": "📸 正在 AI 批改...",
+            "get_subject_info": "📋 正在查询科目信息...",
+        }
+        if self.status_callback:
+            self.status_callback(TOOL_STATUS.get(tool_name, f"🔧 正在调用 {tool_name}..."))
 
         console.print(f"[dim]🔧 调用工具: {tool_name}...[/dim]")
 
@@ -402,6 +414,9 @@ class Agent:
 
         api_messages = [self.conversation[0]]
         api_messages.extend(self.conversation[-19:])
+
+        if self.status_callback:
+            self.status_callback("🎯 正在深度思考...")
 
         with console.status("[cyan]思考中...[/cyan]"):
             try:

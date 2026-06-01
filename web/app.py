@@ -35,10 +35,12 @@ from agent.security import validate_file, strip_exif, detect_injection
 AGENT_INSTANCES: dict = {}  # session_id → Agent
 
 
-def _get_agent(session_id: str) -> Agent:
+def _get_agent(session_id: str, status_cb=None) -> Agent:
     if session_id not in AGENT_INSTANCES:
         conv_id = create_conversation(title=f"Web Session {session_id[:8]}")
-        AGENT_INSTANCES[session_id] = Agent(conv_id=conv_id)
+        AGENT_INSTANCES[session_id] = Agent(conv_id=conv_id, status_callback=status_cb)
+    elif status_cb:
+        AGENT_INSTANCES[session_id].status_callback = status_cb
     return AGENT_INSTANCES[session_id]
 
 
@@ -59,9 +61,14 @@ def _get_welcome():
 def chat_fn(message: str, history: list, session_id: str, subject_code: str):
     """Handle text chat message."""
     if not message.strip():
-        return "", history
+        return "", history, ""
 
-    agent = _get_agent(session_id)
+    status_messages = []
+
+    def status_cb(msg):
+        status_messages.append(msg)
+
+    agent = _get_agent(session_id, status_cb=status_cb)
     if subject_code and subject_code != agent.current_subject:
         agent.set_subject(subject_code)
 
@@ -73,7 +80,22 @@ def chat_fn(message: str, history: list, session_id: str, subject_code: str):
     history = history or []
     history.append({"role": "user", "content": message})
     history.append({"role": "assistant", "content": response})
-    return "", history
+
+    # Build status summary from accumulated messages
+    status_html = _build_status_html(status_messages) if status_messages else ""
+
+    return "", history, status_html
+
+
+def _build_status_html(statuses: list) -> str:
+    """Render tool/thinking status as compact HTML timeline."""
+    if not statuses:
+        return ""
+    items = "".join(
+        f'<div style="font-size:12px;color:#666;padding:2px 0">{s}</div>'
+        for s in statuses[-5:]  # Last 5 status messages
+    )
+    return f'<div style="padding:4px 8px;border-top:1px solid #eee;margin-top:4px">{items}</div>'
 
 
 def grade_image_fn(image, session_id: str, subject_code: str):
@@ -174,6 +196,7 @@ def build_ui():
 
             # ── Main Area ──
             with gr.Column(scale=3):
+                status_display = gr.HTML(label="", value="", elem_classes=["status-display"])
                 chatbot = gr.Chatbot(
                     label="对话",
                     type="messages",
@@ -203,29 +226,29 @@ def build_ui():
                             value="等待上传...",
                         )
 
-        # ── Event Bindings ──
-        msg_input.submit(
-            chat_fn,
-            [msg_input, chatbot, session_id, subject_dd],
-            [msg_input, chatbot],
-        )
-        send_btn.click(
-            chat_fn,
-            [msg_input, chatbot, session_id, subject_dd],
-            [msg_input, chatbot],
-        )
+                # ── Event Bindings ──
+                msg_input.submit(
+                    chat_fn,
+                    [msg_input, chatbot, session_id, subject_dd],
+                    [msg_input, chatbot, status_display],
+                )
+                send_btn.click(
+                    chat_fn,
+                    [msg_input, chatbot, session_id, subject_dd],
+                    [msg_input, chatbot, status_display],
+                )
 
-        image_input.change(
-            grade_image_fn,
-            [image_input, session_id, subject_dd],
-            [grade_output, chatbot],
-        )
+                image_input.change(
+                    grade_image_fn,
+                    [image_input, session_id, subject_dd],
+                    [grade_output, chatbot],
+                )
 
-        subject_dd.change(
-            switch_subject,
-            [subject_dd, session_id],
-            [subject_status],
-        )
+                subject_dd.change(
+                    switch_subject,
+                    [subject_dd, session_id],
+                    [subject_status],
+                )
 
     return demo
 

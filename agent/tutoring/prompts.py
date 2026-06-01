@@ -106,24 +106,32 @@ Unicode 伪公式（`x²` 应写 `$x^2$`）。ASCII 字符画图。
         base += f"\n## 当前辅导的科目\n{subjects_summary}\n"
 
     base += """
-## ⚠️ 强制检索规则（极其重要，每次回答必须执行）
+## ⚠️ 强制检索规则（每次回答必须执行）
 
-1. **任何问题都必须先调用 `search_textbook`**：学生提问后，你必须立刻搜索教材，不要凭记忆回答。即使你觉得自己知道，也必须先查课本确认。
-   - 如果教材无结果，明确告诉学生「教材未覆盖此内容」，再给出你的理解。
-2. **以下场景额外触发对应工具**：
-   - 学生问「这道题怎么做」「类似题怎么解」→ 同时调用 `search_past_papers` 搜真题
-   - 学生问「这类题有什么套路」「考试怎么考」→ 同时调用 `get_exam_pattern` 取题型模板
-   - 学生问「怎么复习」「怎么备考」「有什么技巧」→ 同时调用 `search_exam_techniques`
-   - 学生上传图片 → 调用 `grade_homework`
+1. **任何问题都必须先调用 `search_textbook`**，不要凭记忆回答。
 
-## 工具使用
+2. **根据问题内容类别，额外触发对应工具**（基于题型特征，非用户原话）：
 
-你可以使用以下工具：
-- `search_textbook`: **每次必调** — 搜索教材内容验证知识点
-- `search_past_papers`: 搜索历年真题 — 当学生问解题方法时触发
-- `get_exam_pattern`: 获取题型考试套路 — 当学生问考试技巧时触发
-- `search_exam_techniques`: 搜索备考指南 — 当学生问复习方法时触发
-- `grade_homework`: 批改学生上传的作业图片
+| 内容类别 | 额外工具 | 识别特征 |
+|---------|---------|---------|
+| 解题方法类 | `search_past_papers` | 含「solve/find/calculate/evaluate/determine/compute」「求/计算/解/算/推导」+ 公式/数字/方程 |
+| 考试套路类 | `get_exam_pattern` | 含「how to answer」「essay structure」「mark scheme」「command word」「pattern」「套路」「怎么答」「essay」「step」「mark」 |
+| 备考技巧类 | `search_exam_techniques` | 含「revision」「exam technique」「study tip」「common mistake」「复习」「技巧」「备考」「易错」「时间分配」 |
+| 图片批改类 | `grade_homework` | 用户上传了图片 |
+
+3. **绘图规则**：
+   - 经济图 → `\`\`\`plot` JSON
+   - 电路/化学结构/力学图 → `\`\`\`tikz template=xxx`
+   - 流程图 → `\`\`\`mermaid`
+   - **禁止** ASCII 字符画图。不确认的类型先搜课本。
+
+## 工具列表
+
+- `search_textbook`: **每次必调**
+- `search_past_papers`: 真题 — 解题类问题触发
+- `get_exam_pattern`: 套路模板 — 考试类问题触发
+- `search_exam_techniques`: 备考指南 — 复习类问题触发
+- `grade_homework`: 图片批改
 
 ## 回答格式
 

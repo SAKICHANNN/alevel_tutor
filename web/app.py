@@ -37,6 +37,7 @@ from agent.tutoring.core import (
     _last_conv_len,
     _token_limit_enabled,
     _budget_enabled,
+    _retrieval_limit,
 )
 from agent.tutoring.prompts import welcome_message
 from agent.config import SUBJECTS, SUBJECT_BY_CODE, PROJECT_ROOT
@@ -282,6 +283,7 @@ def chat_fn(message: str, history: list, session_id: str, subject_code: str):
         "conv_len": _last_conv_len,
         "token_limit": _token_limit_enabled,
         "budget": _budget_enabled,
+        "retrieval_limit": _retrieval_limit,
         "user_msg": message[:300],
         "response_len": len(response),
         "svg_count": _last_svg_count,
@@ -395,6 +397,13 @@ def build_ui():
                     interactive=True,
                 )
 
+                retrieval_slider = gr.Slider(
+                    minimum=1, maximum=20, value=3, step=1,
+                    label="📊 检索结果数",
+                    info="每次搜索返回给 LLM 的条数",
+                    interactive=True,
+                )
+
                 gr.Markdown("---")
                 cost_html = gr.HTML(value=get_cost_html, every=30)
 
@@ -476,6 +485,12 @@ def build_ui():
                 budget_toggle.change(
                     lambda enabled: Agent.set_budget(enabled),
                     [budget_toggle],
+                    None,
+                )
+
+                retrieval_slider.change(
+                    lambda n: Agent.set_retrieval_limit(int(n)),
+                    [retrieval_slider],
                     None,
                 )
 

@@ -305,10 +305,14 @@ class Agent:
         scores = {}
         # Known aliases for our 4 subjects — optimization, not requirement
         _aliases = {
-            "9701": ["chemistry", "chem", "化学", "equilibrium", "enthalpy", "organic", "mole", "bond", "periodic"],
-            "9702": ["physics", "phys", "物理", "velocity", "circuit", "wave", "momentum", "kinetic", "magnetic"],
-            "9708": ["economics", "econ", "经济", "demand", "supply", "inflation", "market", "elasticity", "gdp"],
-            "9709": ["math", "maths", "mathematics", "数学", "integrat", "differenti", "calculus", "algebra", "trig", "vector"],
+            "9701": ["chemistry", "chem", "化学", "equilibrium", "enthalpy", "organic", "mole", "bond", "periodic",
+                     "le chatelier", "titration", "redox", "electrolysis", "polymer", "catalyst"],
+            "9702": ["physics", "phys", "物理", "velocity", "circuit", "wave", "momentum", "kinetic", "magnetic",
+                     "ohm", "resistance", "acceleration", "force", "newton", "energy"],
+            "9708": ["economics", "econ", "经济", "demand", "supply", "inflation", "market", "elasticity", "gdp",
+                     "interest rate", "aggregate demand", "monetary", "fiscal", "subsidy", "tax"],
+            "9709": ["math", "maths", "mathematics", "数学", "integrat", "differenti", "calculus", "algebra", "trig", "vector",
+                     "logarithm", "binomial", "coordinate", "sequence", "series"],
         }
         for s in self.subjects:
             score = 0

@@ -496,9 +496,14 @@ class Agent:
         final_content = msg.get("content", "")
         # W5: Save reasoning_content for API continuity (DeepSeek requires it)
         reasoning = msg.get("reasoning_content", "")
-        # W5: Sanitize output — remove self-correction artifacts
+        # W5: Sanitize output — render diagrams, remove self-correction
         final_content = _sanitize_output(final_content)
-        assistant_msg = {"role": "assistant", "content": final_content}
+        # Strip inline base64 images from conversation history to save tokens
+        import re as _re2
+        clean_for_history = _re2.sub(
+            r'!\[diagram\]\(data:image/[^)]+\)',
+            '[📊 Diagram rendered]', final_content)
+        assistant_msg = {"role": "assistant", "content": clean_for_history}
         if reasoning:
             assistant_msg["reasoning_content"] = reasoning
         self.conversation.append(assistant_msg)

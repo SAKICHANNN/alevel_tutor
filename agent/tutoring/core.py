@@ -52,6 +52,7 @@ _last_response_time: float = 0.0
 _last_model: str = ""
 _last_svg_count: int = 0
 _last_conv_len: int = 0
+_token_limit_enabled: bool = True
 
 
 def _fix_katex(content: str) -> str:
@@ -256,7 +257,7 @@ class Agent:
         self.status_callback = status_callback  # fn(str) called on tool/thinking events
 
     def _call_llm(self, messages: list, model_key: str = "tutor", max_retries: int = 2,
-                  tools_list: list = TOOLS) -> dict:
+                   tools_list: list = TOOLS) -> dict:
         config = MODELS[model_key]
         if not config.api_key:
             raise ValueError(f"No API key configured for {model_key}. Set environment variables.")
@@ -275,8 +276,10 @@ class Agent:
             "model": config.model,
             "messages": messages,
             "temperature": config.temperature,
-            "max_tokens": config.max_tokens,
         }
+        global _token_limit_enabled
+        if _token_limit_enabled and config.max_tokens:
+            payload["max_tokens"] = config.max_tokens
         if tools_list:
             payload["tools"] = tools_list
             payload["tool_choice"] = "auto"
@@ -647,3 +650,13 @@ class Agent:
             })
             return f"已切换到 {s.display_name}"
         return f"未找到科目: {subject_code}"
+
+    @staticmethod
+    def set_token_limit(enabled: bool):
+        global _token_limit_enabled
+        _token_limit_enabled = enabled
+        return f"Token limit {'enabled' if enabled else 'disabled'}"
+
+    @staticmethod
+    def get_token_limit() -> bool:
+        return _token_limit_enabled

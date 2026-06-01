@@ -70,12 +70,12 @@ def render_economics(spec: dict) -> Optional[str]:
     try:
         fig, ax = _plot_from_spec(spec)
         buf = io.BytesIO()
-        fig.savefig(buf, format='png', dpi=STYLE['dpi'], bbox_inches='tight',
+        fig.savefig(buf, format='svg', bbox_inches='tight',
                     facecolor='white', edgecolor='none', pad_inches=0.3)
         plt.close(fig)
         buf.seek(0)
         b64 = base64.b64encode(buf.read()).decode('ascii')
-        return f"data:image/png;base64,{b64}"
+        return f"data:image/svg+xml;base64,{b64}"
     except Exception as e:
         print(f"Econ render error: {e}")
         return None

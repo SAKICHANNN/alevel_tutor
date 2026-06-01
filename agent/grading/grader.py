@@ -84,7 +84,8 @@ STAGE2_GRADE_PROMPT = """You are a Cambridge A-Level {subject} examiner. You now
 - FT (Follow-Through): If student made an error earlier but used the correct method thereafter, award the later M marks. Only deduct the A mark for the wrong value.
 - Marks are awarded POSITIVELY. Do not deduct for missing steps.
 - Method must be APPLIED to the problem. Just quoting a formula is NOT enough for M mark.
-- If student writes the final answer with NO working: award ONLY the final A1 if correct, ZERO otherwise (no M marks without working).
+- **IMPORTANT**: If the question is worth only 1 mark and the student gives the correct final answer, award the mark even without working. Single-mark questions test the final result, not the method.
+- If student writes the final answer with NO working: for multi-mark questions, award ONLY the final A1 if correct, ZERO otherwise. For single-mark questions, award full marks if the answer is correct.
 - Ignore minor notation issues unless they change the meaning (e.g., dx instead of dy).
 
 ## Grading Task

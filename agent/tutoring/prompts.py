@@ -92,8 +92,37 @@ def system_prompt(subjects_summary: str = "") -> str:
 - **电路图必须用 template=circuit**，不要用 mermaid 画电路
 - **力学图必须用 template=force**
 - **经济图/函数图必须用 template=graph**
+- **经济模型图使用预置模板（极其重要）**
 - 简单流程图可以用 mermaid
 - **LaTeX 中特殊字符必须用数学模式**：Ω 写成 `$\\Omega$`，不要直接写 Unicode Ω
+
+### 经济学预置模板目录
+
+**以下经济学图表有精确预置模板。直接引用模板名即可，系统自动渲染为考试标准图。**
+
+| 模板名 | 用途 |
+|--------|------|
+| `econ:demand-supply` | 供需基本均衡 (D, S, E, Pe, Qe) |
+| `econ:demand-shift-right` | 需求右移 (D1→D2, P↑, Q↑) |
+| `econ:negative-externality` | 负外部性 (MSC>MPC, DWL 三角) |
+| `econ:ad-as` | AD-AS 宏观模型 (AD, SRAS, LRAS) |
+| `econ:ad-increase` | AD 扩张 (AD1→AD2, 乘数效应) |
+| `econ:tax-incidence` | 税收归宿 (PED/PES 分摊) |
+| `econ:ppc` | 生产可能曲线 (凹形 PPF) |
+| `econ:price-ceiling` | 最高限价 (价格上限, 短缺) |
+| `econ:keynesian-lras` | 凯恩斯 LRAS (三阶段) |
+
+**用法**：输出 `\`\`\`tikz template=econ:ad-as\`\`\`` 即可渲染为精确图表。不要自己写 TikZ 经济图——用模板保证坐标精确！
+
+### 物理预置模板目录
+
+| 模板名 | 用途 |
+|--------|------|
+| `phys:series-circuit` | 串联电路 (电池+电阻+电流) |
+| `phys:parallel-circuit` | 并联电路 |
+| `phys:force-diagram` | 自由体图 (N, mg, F, f) |
+| `phys:wave-diagram` | 波形图 (λ, A, crest, trough) |
+| `phys:inclined-plane` | 斜面力分解 (N, mg, f, mg sinθ) |
 
 ## ⛔ 绝对禁止（极其重要）
 

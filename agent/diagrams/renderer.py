@@ -210,18 +210,62 @@ def extract_and_render_mermaid(content: str) -> str:
 
 
 def extract_and_render_tikz(content: str) -> str:
-    """Find ```tikz blocks in text and replace with rendered SVG images."""
-    pattern = re.compile(r'```tikz(?:\s+template=(\w+))?\s*\n(.*?)```', re.DOTALL)
+    """Find ```tikz blocks in text and replace with rendered SVG images.
+    Supports template references: template=econ:demand-supply"""
+    pattern = re.compile(r'```tikz(?:\s+template=([\w:-]+))?\s*\n(.*?)```', re.DOTALL)
 
     def _replace(match):
-        template = match.group(1) or "general"
+        template_ref = match.group(1) or ""
         code = match.group(2).strip()
+
+        # Check if it's an economics template reference
+        if template_ref.startswith("econ:"):
+            from agent.diagrams.templates.economics import render_template as econ_render, ECON_TEMPLATES
+            tmpl_name = template_ref[5:]
+            tmpl_code = econ_render(tmpl_name)
+            if tmpl_code:
+                uri = render_tikz_full(tmpl_code)
+                if uri:
+                    return f'\n\n![diagram]({uri})\n\n'
+            return match.group(0)
+
+        # Check if it's a physics template reference
+        if template_ref.startswith("phys:"):
+            from agent.diagrams.templates.physics import PHYSICS_TEMPLATES
+            tmpl_name = template_ref[5:]
+            tmpl = PHYSICS_TEMPLATES.get(tmpl_name)
+            if tmpl:
+                code_filled = tmpl["code"].format(**tmpl.get("defaults", {}))
+                uri = render_tikz_full(code_filled)
+                if uri:
+                    return f'\n\n![diagram]({uri})\n\n'
+            return match.group(0)
+
+        template = template_ref or "general"
         uri = render_tikz(code, template)
         if uri:
             return f'\n\n![diagram]({uri})\n\n'
         return match.group(0)
 
     return pattern.sub(_replace, content)
+
+
+def render_tikz_full(full_code: str) -> Optional[str]:
+    """Render a complete LaTeX document (with \documentclass) via Kroki.
+    Unlike render_tikz(), this does NOT wrap in a template."""
+    try:
+        resp = requests.post(
+            f"{KROKI_BASE}/tikz/svg",
+            data=full_code.encode("utf-8"),
+            headers={"Content-Type": "text/plain"},
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            b64 = base64.b64encode(resp.content).decode("ascii")
+            return f"data:image/svg+xml;base64,{b64}"
+    except Exception:
+        pass
+    return None
 
 
 def extract_and_render_vegalite(content: str) -> str:

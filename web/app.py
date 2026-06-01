@@ -97,22 +97,31 @@ def _get_welcome():
 STATUS_STYLE = """
 <style>
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(-8px); }
+  from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes dotPulse {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 1; }
 }
+.status-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  padding: 4px 0;
+}
 .agent-status {
-  animation: slideIn 0.3s ease-out;
-  padding: 16px 20px;
-  margin: 8px 0;
-  border-radius: 12px;
-  font-size: 18px;
+  animation: slideIn 0.25s ease-out;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 15px;
   font-weight: 600;
   text-align: center;
-  letter-spacing: 0.5px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .agent-status .dot { display: inline-block; animation: dotPulse 1.4s infinite; }
 .agent-status .dot:nth-child(2) { animation-delay: 0.2s; }
@@ -136,6 +145,8 @@ STATUS_STYLE = """
 .agent-status.done {
   background: linear-gradient(135deg, #a8e063 0%, #56ab2f 100%);
   color: #fff;
+  font-size: 18px;
+  padding: 16px 28px;
 }
 </style>
 """
@@ -143,37 +154,32 @@ STATUS_STYLE = """
 STATUS_TEMPLATES = {
     "thinking": (
         '<div class="agent-status thinking">'
-        '🧠 深度思考中<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
+        '🧠 深度思考<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
         '</div>'
     ),
     "search_textbook": (
         '<div class="agent-status searching">'
-        '📚 检索教材知识库<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
+        '📚 教材<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
         '</div>'
     ),
     "search_past_paper": (
         '<div class="agent-status searching">'
-        '📝 搜索历年真题<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
+        '📝 真题<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
         '</div>'
     ),
     "get_exam_pattern": (
         '<div class="agent-status pattern">'
-        '🎯 分析考试套路<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
+        '🎯 套路<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
         '</div>'
     ),
     "search_exam_techniques": (
         '<div class="agent-status pattern">'
-        '💡 查找答题技巧<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
+        '💡 技巧<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
         '</div>'
     ),
     "grade_homework_image": (
         '<div class="agent-status grading">'
-        '📸 AI 批改作业中<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
-        '</div>'
-    ),
-    "drawing": (
-        '<div class="agent-status" style="background:linear-gradient(135deg,#ffecd2,#fcb69f);color:#1a1a2e">'
-        '📐 正在绘制图表<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
+        '📸 批改<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
         '</div>'
     ),
     "done": (
@@ -189,13 +195,18 @@ STATUS_KEY_MAP = {
     "📝 正在检索真题...": "search_past_paper",
     "🎯 正在分析解题套路...": "get_exam_pattern",
     "💡 正在查找答题技巧...": "search_exam_techniques",
-    "📸 正在 AI 批改...": "grading",
+    "📸 正在 AI 批改...": "grade_homework_image",
 }
 
 
+def _render_multi_status(active_keys: set) -> str:
+    """Render multiple status cards in parallel."""
+    cards = [STATUS_TEMPLATES.get(k, STATUS_TEMPLATES["thinking"]) for k in active_keys]
+    return STATUS_STYLE + '<div class="status-container">' + "".join(cards) + '</div>'
+
+
 def _render_status(status_key: str) -> str:
-    """Render a single animated status card."""
-    return STATUS_STYLE + STATUS_TEMPLATES.get(status_key, STATUS_TEMPLATES["thinking"])
+    return _render_multi_status({status_key})
 
 
 # ── Callbacks ──
@@ -209,7 +220,6 @@ def chat_fn(message: str, history: list, session_id: str, subject_code: str):
     history = history or []
     history.append({"role": "user", "content": message})
 
-    # Queue for real-time status updates from agent thread
     status_queue = queue.Queue()
     result_container = {"response": None, "error": None}
 
@@ -231,26 +241,29 @@ def chat_fn(message: str, history: list, session_id: str, subject_code: str):
     thread = threading.Thread(target=run_agent, daemon=True)
     thread.start()
 
-    # Yield status updates as they come from the agent
-    last_status = None
+    # Multi-status display
+    active_keys = set()
     while True:
         try:
             status = status_queue.get(timeout=0.15)
         except queue.Empty:
             if not thread.is_alive():
                 break
-            # Re-yield current status to keep animation alive
-            if last_status:
-                status_key = STATUS_KEY_MAP.get(last_status, "thinking")
-                yield "", history, _render_status(status_key)
+            if active_keys:
+                yield "", history, _render_multi_status(active_keys)
             continue
 
         if status == "__DONE__":
+            yield "", history, _render_multi_status({"done"})
             break
 
-        last_status = status
-        status_key = STATUS_KEY_MAP.get(status, "thinking")
-        yield "", history, _render_status(status_key)
+        key = STATUS_KEY_MAP.get(status, "thinking")
+        if key == "thinking":
+            active_keys = {"thinking"}  # thinking resets all tool cards
+        else:
+            active_keys.discard("thinking")
+            active_keys.add(key)
+        yield "", history, _render_multi_status(active_keys)
 
     thread.join(timeout=5)
 
@@ -287,7 +300,7 @@ def chat_fn(message: str, history: list, session_id: str, subject_code: str):
         "response": response[:5000],
     })
 
-    yield "", history, _render_status("done")
+    yield "", history, ""
 
 
 def grade_image_fn(image, session_id: str, subject_code: str):

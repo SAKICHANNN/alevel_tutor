@@ -48,7 +48,6 @@ _AMPERSAND_IN_MATH_RE = re.compile(r'(?<!\\)&(?!\s*amp;)')
 _last_katex_fixes: dict = {"currency": 0, "stray_dollar": 0, "ampersand": 0, "ce_command": 0}
 _last_raw_output: str = ""
 _last_tool_calls: list = []
-_tool_call_history: set = set()
 _last_response_time: float = 0.0
 _last_model: str = ""
 _last_svg_count: int = 0
@@ -487,10 +486,10 @@ class Agent:
 
     def chat(self, user_input: str, image_path: Optional[str] = None) -> str:
         """Process a chat message with optional image."""
-        global _last_raw_output, _last_tool_calls, _last_response_time, _last_model, _last_svg_count, _last_conv_len, _tool_call_history
+        global _last_raw_output, _last_tool_calls, _last_response_time, _last_model, _last_svg_count, _last_conv_len
         _last_raw_output = ""
         _last_tool_calls = []
-        _tool_call_history = set()
+        _last_tc_key = None
         _last_response_time = 0.0
         _last_model = MODELS["tutor"].model if "tutor" in MODELS else "unknown"
         _last_svg_count = 0
@@ -569,19 +568,19 @@ class Agent:
         # Preserve reasoning_content for API continuity
         reasoning_content = msg.get("reasoning_content", "")
 
-        for _ in range(8):
+        for _ in range(20):
             if msg.get("tool_calls"):
-                # Detect duplicate tool calls — stop if same tool+args already used this chat
+                # Detect consecutive duplicate — stop if same tool+args twice in a row
                 for tc in msg["tool_calls"]:
                     tc_key = (tc["function"]["name"], tc["function"]["arguments"])
-                    if tc_key in _tool_call_history:
+                    if tc_key == _last_tc_key:
                         final_content = "⚠️ 检测到重复检索，已停止。请细化你的问题后重新提问。"
                         assistant_msg = {"role": "assistant", "content": final_content}
                         self.conversation.append(assistant_msg)
                         if self.conv_id:
                             save_message(self.conv_id, "assistant", final_content)
                         return final_content
-                    _tool_call_history.add(tc_key)
+                    _last_tc_key = tc_key
                 api_messages.append(msg)
                 if self.conv_id:
                     save_message(self.conv_id, "assistant", msg.get("content", ""),

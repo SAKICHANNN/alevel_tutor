@@ -41,6 +41,13 @@ from agent.security import validate_file, strip_exif, detect_injection
 DEBUG_LOG = PROJECT_ROOT / "data" / "gui_debug.log"
 _MAX_LOG_ENTRIES = 500  # keep last 500 entries
 
+import re as _re
+_SVG_DATA_RE = _re.compile(r'data:image/svg\+xml;base64,[A-Za-z0-9+/=]+')
+
+def _strip_svg(content: str) -> str:
+    """Replace inline SVG data URIs with [SVG] placeholder to save log space."""
+    return _SVG_DATA_RE.sub('[SVG]', content)
+
 
 def _log_debug(entry: dict):
     """Append a JSON line to the debug log. Auto-rotates to keep size bounded."""
@@ -239,7 +246,7 @@ def chat_fn(message: str, history: list, session_id: str, subject_code: str):
         "tool_calls": list(_core._last_tool_calls),
         "elapsed_s": round(_core._last_response_time, 2),
         "error": result_container["error"],
-        "response": response[:15000],
+        "response": _strip_svg(response)[:20000],
     })
 
     yield "", history, ""

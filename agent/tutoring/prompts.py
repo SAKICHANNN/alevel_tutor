@@ -112,7 +112,7 @@ def system_prompt(subjects_summary: str = "") -> str:
 | `econ:price-ceiling` | 最高限价 (价格上限, 短缺) |
 | `econ:keynesian-lras` | 凯恩斯 LRAS (三阶段) |
 
-**用法**：输出 `\`\`\`tikz template=econ:ad-as\`\`\`` 即可渲染为精确图表。
+**用法**：输出 `\`\`\`tikz template=econ:ad-as\`\`\`` 或 `` ```econ {...} `` 即可渲染。**每次回答最多包含一个图表**，多个图表请逐次展示。
 
 ### 经济学自定义图表（JSON 参数化）
 

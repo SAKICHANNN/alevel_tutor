@@ -12,8 +12,8 @@ import base64
 import io
 import json
 import math
+import re
 from typing import Optional, Tuple, List
-
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -71,10 +71,18 @@ def render_economics(spec: dict) -> Optional[str]:
         fig, ax = _plot_from_spec(spec)
         buf = io.BytesIO()
         fig.savefig(buf, format='svg', bbox_inches='tight',
-                    facecolor='white', edgecolor='none', pad_inches=0.3)
+                    facecolor='white', edgecolor='none', pad_inches=0.2)
         plt.close(fig)
         buf.seek(0)
-        b64 = base64.b64encode(buf.read()).decode('ascii')
+        svg_raw = buf.read().decode('utf-8')
+        # Strip matplotlib metadata to reduce size ~30%
+        svg_clean = re.sub(r'<metadata>.*?</metadata>', '', svg_raw, flags=re.DOTALL)
+        svg_clean = re.sub(r'<!--.*?-->', '', svg_clean, flags=re.DOTALL)
+        # Remove verbose clip paths if present
+        svg_clean = re.sub(r'<clipPath[^>]*>.*?</clipPath>', '', svg_clean, flags=re.DOTALL)
+        # Remove empty defs
+        svg_clean = re.sub(r'<defs>\s*</defs>', '', svg_clean)
+        b64 = base64.b64encode(svg_clean.encode('utf-8')).decode('ascii')
         return f"data:image/svg+xml;base64,{b64}"
     except Exception as e:
         print(f"Econ render error: {e}")

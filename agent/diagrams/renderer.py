@@ -240,12 +240,21 @@ def extract_and_render_vegalite(content: str) -> str:
 
 
 def extract_and_render_plot(content: str) -> str:
-    """Find ```plot blocks → render via matplotlib → compact base64 PNG."""
+    """Find ```plot blocks — if {type, ...} → build via spec_builder; else raw spec."""
     pattern = re.compile(r'```plot\s*\n(.*?)```', re.DOTALL)
 
     def _replace(match):
         try:
-            spec = json.loads(match.group(1).strip())
+            params = json.loads(match.group(1).strip())
+            # If has "type" key, use spec builder for correct math
+            if isinstance(params, dict) and "type" in params and "curves" not in params:
+                from agent.diagrams.spec_builder import build_spec
+                spec = build_spec(params)
+                if spec is None:
+                    return match.group(0)
+            else:
+                spec = params  # Raw spec (backward compat)
+
             from agent.diagrams.plotter import render_economics
             uri = render_economics(spec)
             if uri:

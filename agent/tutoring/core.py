@@ -569,7 +569,7 @@ class Agent:
         # Preserve reasoning_content for API continuity
         reasoning_content = msg.get("reasoning_content", "")
 
-        for _ in range(20):
+        for _ in range(8):
             if msg.get("tool_calls"):
                 # Detect duplicate tool calls — stop if same tool+args already used this chat
                 for tc in msg["tool_calls"]:

@@ -72,26 +72,15 @@ def build_externality(external_cost: float = 1.5,
             {"c1": "D", "c2": "MPC", "label": "Eₚ", "offset": (8, -12)},
             {"c1": "D", "c2": "MSC", "label": "Eₛ", "offset": (8, 10)},
         ]
-    else:  # positive
-        MPC_intercept = 1.5
-        MPC_slope = 0.6
-        MSB_intercept = 7 + external_cost
-        MSB_slope = -1.0
-        curves = [
-            {"id": "MPB", "type": "line", "intercept": 7, "slope": -1.0,
-             "color": "demand", "label": "MPB=D"},
-            {"id": "MSB", "type": "line", "intercept": MSB_intercept, "slope": MSB_slope,
-             "color": "msb", "label": "MSB"},
-            {"id": "MPC", "type": "line", "intercept": MPC_intercept, "slope": MPC_slope,
-             "color": "supply", "label": "MPC=S"},
-        ]
-        equilibria = [
-            {"c1": "MPB", "c2": "MPC", "label": "Eₚ", "offset": (8, -12)},
-            {"c1": "MSB", "c2": "MPC", "label": "Eₛ", "offset": (8, 10)},
-        ]
-
-    return {"axes": {"x": "Quantity", "y": "Cost/Benefit"}, "x_max": 8, "y_max": 8,
-            "curves": curves, "equilibria": equilibria}
+        # DWL: shade between MSC and MPC, from Q_social to Q_private
+        shading = [{
+            "upper": "MSC", "lower": "MPC",
+            "left_eq": "Eₛ", "right_eq": "Eₚ",
+            "color": "dwl", "alpha": 0.25,
+            "label": "DWL", "label_pos": (3.2, 4.3)
+        }]
+        return {"axes": {"x": "Quantity", "y": "Cost/Benefit"}, "x_max": 8, "y_max": 8,
+                "curves": curves, "equilibria": equilibria, "shading": shading}
 
 
 def build_ad_as(gap: str = "recessionary", lras_x: float = 5.5) -> Dict[str, Any]:
@@ -158,7 +147,12 @@ def build_monopoly(D_intercept: float = 9.0, MC_slope: float = 0.8) -> Dict[str,
     return {"axes": {"x": "Quantity", "y": "Price/Cost"}, "x_max": 10, "y_max": 10,
             "curves": curves, "equilibria": [
                 {"c1": "MR", "c2": "MC", "label": "MC=MR", "offset": (10, -15)},
-                {"c1": "AR", "c2": "MC", "label": "P=MC", "offset": (10, 10)}]}
+                {"c1": "AR", "c2": "MC", "label": "P=MC", "offset": (10, 10)}],
+            "shading": [
+                {"upper": "AR", "lower": "MC",
+                 "left_eq": "MC=MR", "right_eq": "P=MC",
+                 "color": "dwl", "alpha": 0.2,
+                 "label": "DWL", "label_pos": (3.8, 5.5)}]}
 
 
 def build_tax(tax_amount: float = 1.5) -> Dict[str, Any]:
@@ -178,7 +172,10 @@ def build_tax(tax_amount: float = 1.5) -> Dict[str, Any]:
     return {"axes": {"x": "Quantity", "y": "Price"}, "x_max": 9, "y_max": 9,
             "curves": curves, "equilibria": [
                 {"c1": "D", "c2": "S", "label": "E", "offset": (-12, 10)},
-                {"c1": "D", "c2": "St", "label": "E_t", "offset": (10, -12)}]}
+                {"c1": "D", "c2": "St", "label": "E_t", "offset": (10, -12)}],
+            "shading": [
+                {"upper": "D", "lower": "S", "left_eq": "E_t", "right_eq": "E",
+                 "color": "dwl", "alpha": 0.2, "label": "DWL", "label_pos": (4.2, 5.2)}]}
 
 
 def build_subsidy(subsidy_amount: float = 2.0) -> Dict[str, Any]:

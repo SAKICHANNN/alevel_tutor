@@ -140,6 +140,15 @@ STATUS_MATRIX = [
     ("search_exam_techniques", "c-technique", "💡 技巧"),
 ]
 
+STATUS_KEY_MAP = {
+    "🎯 正在深度思考...": "thinking",
+    "📚 正在检索教材...": "search_textbook",
+    "📝 正在检索真题...": "search_past_paper",
+    "🎯 正在分析解题套路...": "get_exam_pattern",
+    "💡 正在查找答题技巧...": "search_exam_techniques",
+    "📸 正在 AI 批改...": "grade_homework_image",
+}
+
 def _render_matrix(active_keys: set) -> str:
     cells = []
     for key, cls, label in STATUS_MATRIX:

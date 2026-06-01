@@ -621,6 +621,8 @@ class Agent:
                                      tool_call_id=tool_call["id"])
 
                 try:
+                    if self.status_callback:
+                        self.status_callback("🎯 正在深度思考...")
                     response = self._call_llm(api_messages)
                 except Exception as e:
                     error_msg = f"❌ 工具调用后 LLM 失败: {str(e)}"

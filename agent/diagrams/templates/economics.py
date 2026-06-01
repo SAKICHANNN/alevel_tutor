@@ -466,6 +466,207 @@ ECON_TEMPLATES["tariff"] = {
                  "qs2_label": "$Q_{s2}$", "qd2_label": "$Q_{d2}$"},
 }
 
+# ── Template 10: Subsidy ──
+ECON_TEMPLATES["subsidy"] = {
+    "name": "Subsidy Diagram",
+    "description": "Per-unit subsidy shifts supply down, consumer/producer prices, government cost",
+    "code": r"""\documentclass{{standalone}}
+\usepackage{{tikz}}
+\usepackage{{pgfplots}}
+\pgfplotsset{{compat=1.18}}
+\usetikzlibrary{{arrows.meta}}
+\begin{{document}}
+\begin{{tikzpicture}}
+\begin{{axis}}[
+    xlabel={{Quantity}}, ylabel={{Price}},
+    xmin=0, xmax=9, ymin=0, ymax=8,
+    axis lines=left,
+    xtick=\empty, ytick=\empty,
+    width=8cm, height=6cm,
+]
+% Demand
+\addplot[thick,blue,domain=0:8] {{ -1*x + 7 }} node[pos=0.4,right] {{{d_label}}};
+% Supply (pre-subsidy)
+\addplot[thick,red,domain=0:8] {{ 0.6*x + 1.5 }} node[pos=0.3,right] {{{s1_label}}};
+% Supply (post-subsidy, shifted down by 2)
+\addplot[thick,green!50!black,domain=0:8] {{ 0.6*x - 0.5 }} node[pos=0.15,right] {{{s2_label}}};
+% E1: -x+7=0.6x+1.5 → x=3.44, y=3.56
+% E2: -x+7=0.6x-0.5 → x=4.69, y=2.31
+% At Q2=4.69: consumer pays: 2.31, producer receives: 0.6*4.69-0.5+2=4.31
+% Producer price at Q2 on S1: 0.6*4.69+1.5=4.31
+\draw[dashed,gray,thin] (axis cs:3.44,0) -- (axis cs:3.44,3.56);
+\node[below] at (axis cs:3.44,0) {{{q1_label}}};
+\draw[dashed,gray,thin] (axis cs:4.69,0) -- (axis cs:4.69,2.31);
+\node[below] at (axis cs:4.69,0) {{{q2_label}}};
+% Consumer price
+\draw[gray,thin] (axis cs:0,2.31) -- (axis cs:4.69,2.31);
+\node[left] at (axis cs:0,2.31) {{{pc_label}}};
+% Producer price
+\draw[gray,thin] (axis cs:0,4.31) -- (axis cs:4.69,4.31);
+\node[left] at (axis cs:0,4.31) {{{pp_label}}};
+% Subsidy bracket
+\draw[<->,thick,green!50!black] (axis cs:7.5,2.31) -- (axis cs:7.5,4.31) node[midway,right] {{subsidy}};
+% Points
+\node[circle,fill=black,inner sep=1.2pt] at (axis cs:3.44,3.56) {{}};
+\node[above right] at (axis cs:3.44,3.56) {{{e1_label}}};
+\node[circle,fill=black,inner sep=1.2pt] at (axis cs:4.69,2.31) {{}};
+\node[above right] at (axis cs:4.69,2.31) {{{e2_label}}};
+\end{{axis}}
+\end{{tikzpicture}}
+\end{{document}}""",
+    "defaults": {"d_label": "$D$", "s1_label": "$S_1$", "s2_label": "$S_2$ (subsidy)",
+                 "q1_label": "$Q_1$", "q2_label": "$Q_2$",
+                 "pc_label": "$P_c$", "pp_label": "$P_p$",
+                 "e1_label": "$E_1$", "e2_label": "$E_2$", "subsidy": "subsidy = $2"},
+}
+
+# ── Template 11: Minimum Price (Price Floor) ──
+ECON_TEMPLATES["minimum-price"] = {
+    "name": "Minimum Price / Price Floor",
+    "description": "Price floor above equilibrium creates surplus",
+    "code": r"""\documentclass{{standalone}}
+\usepackage{{tikz}}
+\usepackage{{pgfplots}}
+\pgfplotsset{{compat=1.18}}
+\usetikzlibrary{{patterns,patterns.meta}}
+\begin{{document}}
+\begin{{tikzpicture}}
+\begin{{axis}}[
+    xlabel={{Quantity}}, ylabel={{Price}},
+    xmin=0, xmax=9, ymin=0, ymax=9,
+    axis lines=left,
+    xtick=\empty, ytick=\empty,
+    width=8cm, height=6cm,
+]
+% Demand
+\addplot[thick,blue,domain=0:8] {{ -1*x + 8 }} node[right] {{{d_label}}};
+% Supply
+\addplot[thick,red,domain=0:8] {{ 0.8*x + 1 }} node[right] {{{s_label}}};
+% Price floor: horizontal at P=6
+\draw[thick,orange,dashed] (axis cs:0,6) -- (axis cs:8,6) node[right] {{{pf_label}}};
+% Equilibrium: -x+8=0.8x+1 → x=3.89, y=4.11
+% Qd at P=6: -x+8=6 → x=2
+% Qs at P=6: 0.8x+1=6 → x=6.25
+\draw[dashed,gray,thin] (axis cs:2,0) -- (axis cs:2,6);
+\node[below] at (axis cs:2,0) {{{qd_label}}};
+\draw[dashed,gray,thin] (axis cs:6.25,0) -- (axis cs:6.25,6);
+\node[below] at (axis cs:6.25,0) {{{qs_label}}};
+% Surplus
+\draw[<->,thick,red] (axis cs:2,7.5) -- (axis cs:6.25,7.5) node[midway,above] {{surplus}};
+% Equilibrium dot
+\node[circle,fill=black,inner sep=1.2pt] at (axis cs:3.89,4.11) {{}};
+\node[above right] at (axis cs:3.89,4.11) {{{eq_label}}};
+\end{{axis}}
+\end{{tikzpicture}}
+\end{{document}}""",
+    "defaults": {"d_label": "$D$", "s_label": "$S$", "pf_label": "$P_{min}$",
+                 "qd_label": "$Q_d$", "qs_label": "$Q_s$", "eq_label": "$E$",
+                 "surplus": "surplus"},
+}
+
+# ── Template 12: Monopoly (Profit Max + DWL) ──
+ECON_TEMPLATES["monopoly"] = {
+    "name": "Monopoly — Profit Max + DWL",
+    "description": "MC=MR profit max, price from demand, DWL vs perfect competition",
+    "code": r"""\documentclass{{standalone}}
+\usepackage{{tikz}}
+\usepackage{{pgfplots}}
+\pgfplotsset{{compat=1.18}}
+\usetikzlibrary{{patterns,patterns.meta}}
+\begin{{document}}
+\begin{{tikzpicture}}
+\begin{{axis}}[
+    xlabel={{Quantity}}, ylabel={{Price/Cost}},
+    xmin=0, xmax=10, ymin=0, ymax=10,
+    axis lines=left,
+    xtick=\empty, ytick=\empty,
+    width=8cm, height=7cm,
+]
+% Demand = AR
+\addplot[thick,blue,domain=0:9] {{ -1*x + 9 }} node[right] {{{ar_label}}};
+% MR (twice slope)
+\addplot[thick,blue!60,dashed,domain=0:4.5] {{ -2*x + 9 }} node[pos=0.3,below] {{{mr_label}}};
+% MC (upward from origin)
+\addplot[thick,red,domain=1:9] {{ 0.8*x + 1 }} node[right] {{{mc_label}}};
+% AC (U-shaped, approximated)
+\addplot[thick,orange,dotted,domain=1:9] {{ 0.3*x + 3 }} node[right] {{{ac_label}}};
+% MR=MC: -2x+9=0.8x+1 → x=2.86
+% Price from demand at Qm: y=-2.86+9=6.14
+% Perfect competition: D=MC → -x+9=0.8x+1 → x=4.44
+\draw[dashed,gray,thin] (axis cs:2.86,0) -- (axis cs:2.86,6.14);
+\node[below] at (axis cs:2.86,0) {{{qm_label}}};
+\node[left] at (axis cs:0,6.14) {{{pm_label}}};
+\node[circle,fill=black,inner sep=1.2pt] at (axis cs:2.86,6.14) {{}};
+\node[above left] at (axis cs:2.86,6.14) {{{monopoly_label}}};
+% PC equilibrium
+\draw[dashed,gray,thin] (axis cs:4.44,0) -- (axis cs:4.44,4.56);
+\node[below] at (axis cs:4.44,0) {{{qc_label}}};
+\node[left] at (axis cs:0,4.56) {{{pc_label}}};
+\node[circle,fill=black,inner sep=1.2pt] at (axis cs:4.44,4.56) {{}};
+\node[above right] at (axis cs:4.44,4.56) {{{comp_label}}};
+% DWL triangle
+\fill[red,opacity=0.12] (axis cs:2.86,6.14) -- (axis cs:2.86,4.56) -- (axis cs:4.44,4.56) -- cycle;
+\node[red] at (axis cs:3.5,5.0) {{\\tiny DWL}};
+\end{{axis}}
+\end{{tikzpicture}}
+\end{{document}}""",
+    "defaults": {"ar_label": "$D=AR$", "mr_label": "$MR$", "mc_label": "$MC$",
+                 "ac_label": "$AC$", "qm_label": "$Q_m$", "pm_label": "$P_m$",
+                 "qc_label": "$Q_c$", "pc_label": "$P_c$",
+                 "monopoly_label": "Monopoly", "comp_label": "Perfect Comp."},
+}
+
+# ── Template 13: Monopsony Labour Market ──
+ECON_TEMPLATES["monopsony"] = {
+    "name": "Monopsony Labour Market",
+    "description": "MCL > ACL=S, MRP demand, monopsony wage below competitive",
+    "code": r"""\documentclass{{standalone}}
+\usepackage{{tikz}}
+\usepackage{{pgfplots}}
+\pgfplotsset{{compat=1.18}}
+\usetikzlibrary{{arrows.meta}}
+\begin{{document}}
+\begin{{tikzpicture}}
+\begin{{axis}}[
+    xlabel={{Quantity of Labour}}, ylabel={{Wage Rate}},
+    xmin=0, xmax=9, ymin=0, ymax=8,
+    axis lines=left,
+    xtick=\empty, ytick=\empty,
+    width=9cm, height=7cm,
+]
+% ACL = Labour Supply
+\addplot[thick,blue,domain=0:7] {{ 0.6*x + 0.8 }} node[right] {{{acl_label}}};
+% MCL (steeper than ACL, same intercept for linear)
+\addplot[thick,red,domain=0:6] {{ 1.2*x + 0.8 }} node[right] {{{mcl_label}}};
+% MRP = Labour Demand (downward)
+\addplot[thick,green!50!black,domain=0:7] {{ -0.8*x + 6.5 }} node[right] {{{mrp_label}}};
+% Monopsony: MCL=MRP → 1.2x+0.8=-0.8x+6.5 → x=2.85
+% Wage from ACL at Lm: 0.6*2.85+0.8=2.51
+% Competition: ACL=MRP → 0.6x+0.8=-0.8x+6.5 → x=4.07
+% Wage at Lc: 0.6*4.07+0.8=3.24
+% Monopsony
+\draw[dashed,gray,thin] (axis cs:2.85,0) -- (axis cs:2.85,2.51);
+\node[below] at (axis cs:2.85,0) {{{lm_label}}};
+\draw[gray,thin] (axis cs:0,2.51) -- (axis cs:2.85,2.51);
+\node[left] at (axis cs:0,2.51) {{{wm_label}}};
+\node[circle,fill=black,inner sep=1.2pt] at (axis cs:2.85,2.51) {{}};
+% MCL=MRP intersection
+\node[circle,fill=black,inner sep=1.2pt] at (axis cs:2.85,4.22) {{}};
+% Competition
+\draw[dashed,gray,thin] (axis cs:4.07,0) -- (axis cs:4.07,3.24);
+\node[below] at (axis cs:4.07,0) {{{lc_label}}};
+\draw[gray,thin] (axis cs:0,3.24) -- (axis cs:4.07,3.24);
+\node[left] at (axis cs:0,3.24) {{{wc_label}}};
+\node[circle,fill=black,inner sep=1.2pt] at (axis cs:4.07,3.24) {{}};
+\end{{axis}}
+\end{{tikzpicture}}
+\end{{document}}""",
+    "defaults": {"acl_label": "$AC_L=S_L$", "mcl_label": "$MC_L$",
+                 "mrp_label": "$MRP=D_L$",
+                 "lm_label": "$L_m$", "wm_label": "$W_m$",
+                 "lc_label": "$L_c$", "wc_label": "$W_c$"},
+}
+
 # ── Build all templates ──
 def get_template(name: str) -> Optional[dict]:
     return ECON_TEMPLATES.get(name)

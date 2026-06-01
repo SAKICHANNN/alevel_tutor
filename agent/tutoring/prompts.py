@@ -96,28 +96,30 @@ def system_prompt(subjects_summary: str = "") -> str:
 - 简单流程图可以用 mermaid
 - **LaTeX 中特殊字符必须用数学模式**：Ω 写成 `$\\Omega$`，不要直接写 Unicode Ω
 
-### 经济学图表（强制模板）
+### 经济学图表（强制使用模板）
 
-**画任何经济学图时，必须使用以下预置模板。禁止自己写 TikZ 坐标或 JSON 规格。模板已由人工验证，符合 Cambridge 评分标准。**
+**画经济图时，只能使用以下预置模板。禁止自己写 TikZ 坐标！模板坐标已由数学验证。**
 
 | 模板名 | 用途 |
 |--------|------|
-| `econ:demand-supply` | 供需基本均衡 |
-| `econ:demand-shift-right` | 需求右移 |
-| `econ:negative-externality` | 负外部性 (MSC>MPC, DWL) |
-| `econ:ad-as` | AD-AS 宏观模型 |
-| `econ:ad-increase` | AD 扩张 |
-| `econ:tax-incidence` | 税收归宿 (PED/PES) |
-| `econ:ppc` | 生产可能曲线 |
-| `econ:price-ceiling` | 最高限价 |
+| `econ:demand-supply` | 供需基本均衡 (D+S+E) |
+| `econ:demand-shift-right` | 需求右移 (D1→D2) |
+| `econ:negative-externality` | 负外部性 (MSC>MPC, DWL三角) |
+| `econ:ad-as` | AD-AS 模型 (AD+SRAS+LRAS) |
+| `econ:ad-increase` | AD 扩张 (AD1→AD2, 乘数) |
+| `econ:tax-incidence` | 税收归宿 (PED/PES 分摊) |
+| `econ:ppc` | 生产可能曲线 (PPF) |
+| `econ:price-ceiling` | 最高限价 (短缺) |
+| `econ:minimum-price` | 最低限价 (过剩) |
 | `econ:keynesian-lras` | 凯恩斯 LRAS (三阶段) |
-| `econ:tariff` | 关税分析 |
+| `econ:tariff` | 关税分析 (Pw, Pw+t, imports) |
+| `econ:subsidy` | 补贴 (S1→S2, Pc, Pp) |
+| `econ:monopoly` | 垄断 (D=AR, MR, MC, AC, DWL) |
+| `econ:monopsony` | 买方垄断劳动力 (ACL, MCL, MRP) |
 
-**用法**：`\`\`\`tikz template=econ:ad-as\`\`\`` → 自动渲染为考试标准图。
+**用法**：`\`\`\`tikz template=econ:monopoly\`\`\`` → 自动渲染。
 
-**如果需求不匹配任何模板**，用 `\`\`\`tikz template=graph\`\`\`` + pgfplots 手写（TikZ 坐标精确）。
-
-**绝对禁止用 ASCII 字符画经济图！禁止用 ```econ JSON 格式！**
+**绝对禁止**：自己写 TikZ 坐标画经济图。ASCII 字符画。```econ JSON 格式。
 
 ### 物理预置模板目录
 

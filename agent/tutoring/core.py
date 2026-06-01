@@ -54,7 +54,6 @@ _last_svg_count: int = 0
 _last_conv_len: int = 0
 _token_limit_enabled: bool = True
 _budget_enabled: bool = True
-_retrieval_limit: int = 3
 
 
 def _fix_katex(content: str) -> str:
@@ -169,12 +168,13 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "search_textbook",
-            "description": "搜索教材/课本内容。当学生问概念性问题、需要知识解释时使用。",
+            "description": "搜索教材/课本内容。任何问题必须首先调用此工具。",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "搜索关键词，如 'Le Chatelier principle' 或 'integration by parts'"},
+                    "query": {"type": "string", "description": "搜索关键词"},
                     "subject_code": {"type": "string", "description": "科目代码: 9701/9702/9708/9709"},
+                    "n_results": {"type": "integer", "description": "需要的结果条数。简单概念1-3，复杂题型4-10，全面梳理15-50", "default": 3},
                 },
                 "required": ["query"],
             },
@@ -184,13 +184,14 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "search_past_paper",
-            "description": "搜索历年真题。当学生问做题、考试题怎么解时使用。",
+            "description": "搜索历年真题。当学生问解题方法、类似题型时触发。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "搜索关键词"},
                     "subject_code": {"type": "string", "description": "科目代码: 9701/9702/9708/9709"},
                     "paper_type": {"type": "string", "description": "试卷类型: qp(题目)/ms(答案)/er(考官报告)"},
+                    "n_results": {"type": "integer", "description": "需要的结果条数。一题3-5，多题对比10-20", "default": 5},
                 },
                 "required": ["query"],
             },
@@ -373,31 +374,34 @@ class Agent:
         console.print(f"[dim]🔧 调用工具: {tool_name}...[/dim]")
 
         if tool_name == "search_textbook":
+            n = max(1, min(50, int(arguments.get("n_results", 3))))
             results = search_textbooks(
                 arguments.get("query", ""),
                 arguments.get("subject_code"),
+                n_results=n,
                 use_rerank=True,
             )
             if not results:
                 return "教材中未找到相关内容。改为用通用知识回答。"
-            global _retrieval_limit
             return sanitize_retrieved_content("\n\n".join(
                 f"[来源: 教材 {r['metadata'].get('filename','')} | 引用时请写 📎 {arguments.get('subject_code','')} §{r['metadata'].get('filename','')[:20]} (textbook)]\n{r['content'][:1500]}"
-                for r in results[:_retrieval_limit]
+                for r in results[:n]
             ))
 
         elif tool_name == "search_past_paper":
+            n = max(1, min(50, int(arguments.get("n_results", 5))))
             results = search_past_papers(
                 arguments.get("query", ""),
                 arguments.get("subject_code"),
                 arguments.get("paper_type"),
+                n_results=n,
                 use_rerank=True,
             )
             if not results:
                 return "未找到匹配的真题。改为用通用知识回答。"
             return "\n\n".join(
                 f"[真题 {r['metadata'].get('year','')} {r['metadata'].get('type','')}]\n{r['content'][:1500]}"
-                for r in results[:_retrieval_limit]
+                for r in results[:n]
             )
 
         elif tool_name == "get_exam_pattern":
@@ -427,15 +431,17 @@ class Agent:
             return "请上传图片。在 CLI 中使用 `/grade <路径>`，或直接在聊天中附上图片。"
 
         elif tool_name == "search_exam_techniques":
+            n = max(1, min(20, int(arguments.get("n_results", 3))))
             results = _search_techniques(
                 arguments.get("query", ""),
                 arguments.get("subject_code"),
+                n_results=n,
             )
             if not results:
                 return "未找到匹配的考试技巧。请尝试更具体的问题。"
             return "\n\n".join(
                 f"[考试技巧 {r['metadata'].get('filename','')}]\n{r['content'][:1200]}"
-                for r in results[:_retrieval_limit]
+                for r in results[:n]
             )
 
         elif tool_name == "get_subject_info":
@@ -680,10 +686,8 @@ class Agent:
 
     @staticmethod
     def set_retrieval_limit(n: int):
-        global _retrieval_limit
-        _retrieval_limit = max(1, min(n, 100))
-        return f"Retrieval limit set to {_retrieval_limit}"
+        pass  # removed — n_results now controlled by LLM per call
 
     @staticmethod
     def get_retrieval_limit() -> int:
-        return _retrieval_limit
+        return 3  # stub — n_results now controlled by LLM per call

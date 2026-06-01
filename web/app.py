@@ -97,10 +97,6 @@ def _get_welcome():
 
 STATUS_STYLE = """
 <style>
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.05); }
-}
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -118,7 +114,6 @@ STATUS_STYLE = """
   font-weight: 600;
   text-align: center;
   letter-spacing: 0.5px;
-  transition: all 0.3s ease;
 }
 .agent-status .dot { display: inline-block; animation: dotPulse 1.4s infinite; }
 .agent-status .dot:nth-child(2) { animation-delay: 0.2s; }
@@ -126,7 +121,6 @@ STATUS_STYLE = """
 .agent-status.thinking {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
-  animation: slideIn 0.3s ease-out, pulse 2s ease-in-out infinite;
 }
 .agent-status.searching {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);

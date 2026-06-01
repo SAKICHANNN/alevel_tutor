@@ -682,7 +682,7 @@ class Agent:
     @staticmethod
     def set_retrieval_limit(n: int):
         global _retrieval_limit
-        _retrieval_limit = max(1, min(n, 20))
+        _retrieval_limit = max(1, min(n, 100))
         return f"Retrieval limit set to {_retrieval_limit}"
 
     @staticmethod

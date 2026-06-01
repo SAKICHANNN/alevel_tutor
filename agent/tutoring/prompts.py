@@ -29,60 +29,71 @@ def system_prompt(subjects_summary: str = "") -> str:
 
 ## 📐 图表绘制（强制规则）
 
-**绝对禁止 ASCII 字符画图。** 像下面这样的文字排版图在学生界面会变成乱码，学生完全看不懂：
+**绝对禁止 ASCII 字符画图。** 本平台支持 4 种专业图表引擎。
 
-```
-❌ 禁止：
-     ┌─[10V]─┐
-     │       │
-     └─[R]───┘
+### 引擎选型指南
 
-❌ 禁止：
-  5A → ● → 3A
-```
+| 图表类型 | 引擎 | 示例场景 |
+|---------|------|---------|
+| 电路图 | `tikz` (circuitikz) | 串联/并联电路、Kirchhoff |
+| 力/运动图 | `tikz` | 自由体图、斜面、滑轮 |
+| 经济曲线 | `tikz` (pgfplots) | 供需、AD-AS、弹性 |
+| 坐标几何 | `tikz` (pgfplots) | 函数图、切线、圆 |
+| 能量循环 | `tikz` | Born-Haber、Hess |
+| 化学结构 | `tikz` (chemfig) | 有机分子、官能团 |
+| 流程图 | `mermaid` | 解题步骤、反应路径 |
+| 数据图表 | `vegalite` | 速率曲线、滴定曲线 |
+| 波/场图 | `tikz` | 波干涉、电场线 |
 
-**当你的回答涉及以下任一内容时，必须用 Mermaid 代码块画图：**
-- 电路原理（Kirchhoff、串联、并联、分压）
-- 流程图/步骤关系
-- 力的分解/自由体图方向
-- 反应路径/能量变化示意
-- 任何箭头→节点●连接关系
+### TikZ 电路图 (circuitikz) 示例
 
-**Mermaid 正确写法**（把代码放在 \`\`\`mermaid 代码块中）：
-
-电路节点（电流分配）：
-\`\`\`mermaid
-graph LR
-    IN[5A 流入] --> N((节点))
-    N --> OUT1[3A 流出]
-    N --> OUT2[2A 流出]
+\`\`\`tikz template=circuit
+\draw (0,0) to[battery,l=12V] (0,3) to[short] (3,3) to[resistor,l=4Ω] (3,1.5) to[resistor,l=8Ω] (3,0) to[short] (0,0);
 \`\`\`
 
-串联电路（电压分配）：
-\`\`\`mermaid
-graph LR
-    B[12V 电池] --> R1[4Ω 电阻]
-    R1 --> R2[8Ω 电阻]
-    R2 --> B
+### TikZ 力/图示例
+
+\`\`\`tikz template=force
+\\draw[thick] (0,0) rectangle (2,1) node[midway] {物体};
+\\draw[->,thick] (1,1) -- (1,2.5) node[right] {$N$};
+\\draw[->,thick] (1,0) -- (1,-1.5) node[right] {$mg$};
+\\draw[->,thick] (0,0.5) -- (-1.5,0.5) node[above] {$f$};
 \`\`\`
 
-力学自由体图：
-\`\`\`mermaid
-graph TD
-    G[重力 ↓ mg] --> O((物体))
-    N[支持力 ↑ N] --> O
-    F[推力 → F] --> O
-    f[摩擦力 ← f] --> O
+### TikZ 经济图 (pgfplots) 示例
+
+\`\`\`tikz template=graph
+\\begin{tikzpicture}
+\\begin{axis}[xlabel={Quantity},ylabel={Price},xmin=0,xmax=6,ymin=0,ymax=6]
+\\addplot[thick,blue] coordinates {(1,5)(5,1)} node[right] {$D$};
+\\addplot[thick,red] coordinates {(1,1)(5,5)} node[right] {$S$};
+\\end{axis}
+\\end{tikzpicture}
 \`\`\`
 
-反应路径：
-\`\`\`mermaid
-graph LR
-    A[反应物] -->|活化能 Ea| TS[过渡态]
-    TS --> B[生成物]
+### TikZ 化学结构 (chemfig) 示例
+
+\`\`\`tikz template=chemfig
+\\chemfig{C(-[2]H)(-[4]H)(-[6]H)-C(-[2]H)(-[6]H)=O}
 \`\`\`
 
-**记住：需要画图时就用 Mermaid。用文字描述 + Mermaid 代码块，不要用 ASCII 字符拼图。**
+### Vega-Lite 数据图示例
+
+\`\`\`vegalite
+{
+  "data": {"values": [{"x": 0, "y": 0}, {"x": 1, "y": 1}, {"x": 2, "y": 4}]},
+  "mark": "line",
+  "encoding": {"x": {"field": "x", "type": "quantitative"}, "y": {"field": "y", "type": "quantitative"}}
+}
+\`\`\`
+
+### 重要提示
+- TikZ 代码块必须标注 template（circuit/graph/force/chemfig/general）
+- **电路图必须用 template=circuit**，不要用 mermaid 画电路
+- **力学图必须用 template=force**
+- **经济图/函数图必须用 template=graph**
+- 简单流程图可以用 mermaid
+- **LaTeX 中特殊字符必须用数学模式**：Ω 写成 `$\\Omega$`，不要直接写 Unicode Ω
 
 ## ⛔ 绝对禁止（极其重要）
 

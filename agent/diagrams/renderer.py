@@ -303,7 +303,6 @@ def extract_and_render_econ(content: str) -> str:
 
 def render_all_diagrams(content: str) -> str:
     """Post-process LLM output: render all diagram code blocks to SVG/PNG images."""
-    content = extract_and_render_econ(content)
     content = extract_and_render_mermaid(content)
     content = extract_and_render_tikz(content)
     content = extract_and_render_vegalite(content)

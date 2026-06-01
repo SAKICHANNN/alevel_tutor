@@ -96,111 +96,28 @@ def system_prompt(subjects_summary: str = "") -> str:
 - 简单流程图可以用 mermaid
 - **LaTeX 中特殊字符必须用数学模式**：Ω 写成 `$\\Omega$`，不要直接写 Unicode Ω
 
-### 经济学预置模板目录
+### 经济学图表（强制模板）
 
-**以下经济学图表有精确预置模板。直接引用模板名即可，系统自动渲染为考试标准图。**
+**画任何经济学图时，必须使用以下预置模板。禁止自己写 TikZ 坐标或 JSON 规格。模板已由人工验证，符合 Cambridge 评分标准。**
 
 | 模板名 | 用途 |
 |--------|------|
-| `econ:demand-supply` | 供需基本均衡 (D, S, E, Pe, Qe) |
-| `econ:demand-shift-right` | 需求右移 (D1→D2, P↑, Q↑) |
-| `econ:negative-externality` | 负外部性 (MSC>MPC, DWL 三角) |
-| `econ:ad-as` | AD-AS 宏观模型 (AD, SRAS, LRAS) |
-| `econ:ad-increase` | AD 扩张 (AD1→AD2, 乘数效应) |
-| `econ:tax-incidence` | 税收归宿 (PED/PES 分摊) |
-| `econ:ppc` | 生产可能曲线 (凹形 PPF) |
-| `econ:price-ceiling` | 最高限价 (价格上限, 短缺) |
+| `econ:demand-supply` | 供需基本均衡 |
+| `econ:demand-shift-right` | 需求右移 |
+| `econ:negative-externality` | 负外部性 (MSC>MPC, DWL) |
+| `econ:ad-as` | AD-AS 宏观模型 |
+| `econ:ad-increase` | AD 扩张 |
+| `econ:tax-incidence` | 税收归宿 (PED/PES) |
+| `econ:ppc` | 生产可能曲线 |
+| `econ:price-ceiling` | 最高限价 |
 | `econ:keynesian-lras` | 凯恩斯 LRAS (三阶段) |
+| `econ:tariff` | 关税分析 |
 
-**用法**：输出 `\`\`\`tikz template=econ:ad-as\`\`\`` 或 `` ```econ {...} `` 即可渲染。**每次回答最多包含一个图表**，多个图表请逐次展示。
+**用法**：`\`\`\`tikz template=econ:ad-as\`\`\`` → 自动渲染为考试标准图。
 
-### 经济学自定义图表（JSON 参数化）
+**如果需求不匹配任何模板**，用 `\`\`\`tikz template=graph\`\`\`` + pgfplots 手写（TikZ 坐标精确）。
 
-**当模板不够用时**，你可以输出 JSON econ 图表规格，系统将用数学引擎渲染精确图表。
-
-**通用格式**：
-\`\`\`econ
-{
-  "axes": {"x": "横轴标签", "y": "纵轴标签"},
-  "x_max": 10, "y_max": 10,
-  "curves": [
-    {"name": "唯一ID", "type": "line|vertical|horizontal", "intercept": 截距, "slope": 斜率, "color": "#hex", "label": "标签"}
-  ],
-  "points": [
-    {"curve1": "D", "curve2": "S", "label": "E₁", "offset": [dx, dy]}
-  ],
-  "areas": [
-    {"type": "between|triangle|rectangle", "curve1": "上线名", "curve2": "下线名", "x1": 左边界, "x2": 右边界, "color": "#hex", "label": "标签", "label_pos": [x, y]}
-  ]
-}
-\`\`\`
-
-**曲线命名约定**（系统自动计算交点）：
-- 需求曲线用 "D", "D1", "D2"，截距高→低（如 7→5），斜率负（如 -1）
-- 供给曲线用 "S", "S1", "S2"，截距低→高（如 1.5→3），斜率正（如 0.6）
-- AD 用 "AD", "AD1"，斜率负（如 -0.9），截距大
-- SRAS 用 "SRAS"，斜率正（如 0.5）
-- LRAS 用 type "vertical"，x=潜在产出
-- 外部性：MPC/MSC 用相同斜率不同截距
-- 税收/补贴线：type "horizontal"，y=价格
-- 颜色：蓝=#2B5B84(需求/AD)，红=#C44E52(供给/SRAS)，橙=#E67E22(MSC)，深灰=#2C3E50(LRAS)
-
-**弹性调整**：要画 elastic demand（平坦），减小斜率的绝对值（如 -0.5）；inelastic（陡峭），增大绝对值（如 -1.5）。
-
-**交点标注**：只需列出曲线名对（如 "D"+"S"），系统自动解方程计算坐标并画点。
-
-**示例——需求右移**：
-\`\`\`econ
-{
-  "axes": {"x": "Quantity", "y": "Price ($)"},
-  "x_max": 9, "y_max": 9,
-  "curves": [
-    {"name": "D1", "type": "line", "intercept": 7, "slope": -1, "color": "#2B5B84", "label": "D₁"},
-    {"name": "D2", "type": "line", "intercept": 8.5, "slope": -1, "color": "#4C9BCF", "label": "D₂"},
-    {"name": "S", "type": "line", "intercept": 1.5, "slope": 0.6, "color": "#C44E52", "label": "S"}
-  ],
-  "points": [
-    {"curve1": "D1", "curve2": "S", "label": "E₁", "offset": [-15, 8]},
-    {"curve1": "D2", "curve2": "S", "label": "E₂", "offset": [8, 8]}
-  ]
-}
-\`\`\`
-
-**示例——负外部性**：
-\`\`\`econ
-{
-  "axes": {"x": "Quantity", "y": "Cost/Benefit ($)"},
-  "x_max": 8, "y_max": 8,
-  "curves": [
-    {"name": "D", "type": "line", "intercept": 7, "slope": -1, "color": "#2B5B84", "label": "D=MPB=MSB"},
-    {"name": "MPC", "type": "line", "intercept": 1.5, "slope": 0.6, "color": "#C44E52", "label": "MPC=S"},
-    {"name": "MSC", "type": "line", "intercept": 3, "slope": 0.6, "color": "#E67E22", "label": "MSC"}
-  ],
-  "points": [
-    {"curve1": "D", "curve2": "MPC", "label": "Eₚ", "offset": [8, -12]},
-    {"curve1": "D", "curve2": "MSC", "label": "Eₛ", "offset": [8, 8]}
-  ],
-  "areas": [
-    {"type": "between", "curve1": "MSC", "curve2": "MPC", "x1": "Eₛ", "x2": "Eₚ", "color": "#F1948A", "label": "DWL", "label_pos": [3.2, 4.3]}
-  ]
-}
-\`\`\`
-
-**示例——AD-AS 模型**：
-\`\`\`econ
-{
-  "axes": {"x": "Real GDP (Y)", "y": "Price Level (P)"},
-  "x_max": 10, "y_max": 8,
-  "curves": [
-    {"name": "AD", "type": "line", "intercept": 7.5, "slope": -0.9, "color": "#2B5B84", "label": "AD"},
-    {"name": "SRAS", "type": "line", "intercept": 2, "slope": 0.5, "color": "#C44E52", "label": "SRAS"},
-    {"name": "LRAS", "type": "vertical", "x": 5.5, "color": "#2C3E50", "label": "LRAS"}
-  ],
-  "points": [
-    {"curve1": "AD", "curve2": "SRAS", "label": "E₁", "offset": [8, 8]}
-  ]
-}
-\`\`\`不要自己写 TikZ 经济图——用模板保证坐标精确！
+**绝对禁止用 ASCII 字符画经济图！禁止用 ```econ JSON 格式！**
 
 ### 物理预置模板目录
 
@@ -211,6 +128,8 @@ def system_prompt(subjects_summary: str = "") -> str:
 | `phys:force-diagram` | 自由体图 (N, mg, F, f) |
 | `phys:wave-diagram` | 波形图 (λ, A, crest, trough) |
 | `phys:inclined-plane` | 斜面力分解 (N, mg, f, mg sinθ) |
+
+**用法**：`\`\`\`tikz template=phys:series-circuit\`\`\``
 
 ## ⛔ 绝对禁止（极其重要）
 

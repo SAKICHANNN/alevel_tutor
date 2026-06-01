@@ -212,11 +212,9 @@ def _draw_eq_point(ax, xy, eq, x_max, y_max):
             markeredgecolor='white', markeredgewidth=2)
     label = eq.get("label", "")
     if label:
-        ox = eq.get("offset", (0.5, 0.5))
-        tx = max(0.2, min(x_max - 0.2, x + float(ox[0])))
-        ty = max(0.2, min(y_max - 0.2, y + float(ox[1])))
+        ox = eq.get("offset", (12, 12))
         ax.annotate(label, xy=(x, y), fontsize=14, fontweight='bold',
-                    xytext=(tx, ty), textcoords='data',
+                    xytext=(float(ox[0]), float(ox[1])), textcoords='offset points',
                     bbox=dict(boxstyle='round,pad=0.25', facecolor='white',
                              edgecolor='#999', linewidth=0.5, alpha=0.95),
                     zorder=6)

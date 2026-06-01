@@ -54,6 +54,7 @@ _last_svg_count: int = 0
 _last_conv_len: int = 0
 _token_limit_enabled: bool = True
 _budget_enabled: bool = True
+_retrieval_limit: int = 3
 
 
 def _fix_katex(content: str) -> str:
@@ -379,9 +380,10 @@ class Agent:
             )
             if not results:
                 return "教材中未找到相关内容。改为用通用知识回答。"
+            global _retrieval_limit
             return sanitize_retrieved_content("\n\n".join(
                 f"[来源: 教材 {r['metadata'].get('filename','')} | 引用时请写 📎 {arguments.get('subject_code','')} §{r['metadata'].get('filename','')[:20]} (textbook)]\n{r['content'][:1500]}"
-                for r in results[:3]
+                for r in results[:_retrieval_limit]
             ))
 
         elif tool_name == "search_past_paper":
@@ -395,7 +397,7 @@ class Agent:
                 return "未找到匹配的真题。改为用通用知识回答。"
             return "\n\n".join(
                 f"[真题 {r['metadata'].get('year','')} {r['metadata'].get('type','')}]\n{r['content'][:1500]}"
-                for r in results[:3]
+                for r in results[:_retrieval_limit]
             )
 
         elif tool_name == "get_exam_pattern":
@@ -433,7 +435,7 @@ class Agent:
                 return "未找到匹配的考试技巧。请尝试更具体的问题。"
             return "\n\n".join(
                 f"[考试技巧 {r['metadata'].get('filename','')}]\n{r['content'][:1200]}"
-                for r in results[:3]
+                for r in results[:_retrieval_limit]
             )
 
         elif tool_name == "get_subject_info":
@@ -676,3 +678,13 @@ class Agent:
     @staticmethod
     def get_budget() -> bool:
         return _budget_enabled
+
+    @staticmethod
+    def set_retrieval_limit(n: int):
+        global _retrieval_limit
+        _retrieval_limit = max(1, min(n, 20))
+        return f"Retrieval limit set to {_retrieval_limit}"
+
+    @staticmethod
+    def get_retrieval_limit() -> int:
+        return _retrieval_limit

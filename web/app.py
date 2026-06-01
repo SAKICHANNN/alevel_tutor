@@ -309,12 +309,42 @@ def switch_subject(code: str, session_id: str):
 def build_ui():
     theme = gr.themes.Soft(primary_hue="blue", secondary_hue="indigo")
 
+    # Mermaid.js + LaTeX initialization
+    mermaid_init = """
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    // Observe DOM for new mermaid blocks added dynamically (chat streaming)
+    const observer = new MutationObserver(() => {
+        document.querySelectorAll('pre code.language-mermaid').forEach(block => {
+            if (!block.closest('.mermaid-rendered')) {
+                const parent = block.parentElement;
+                parent.classList.add('mermaid-rendered');
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.textContent;
+                parent.replaceWith(div);
+                try { mermaid.run({ nodes: [div] }); } catch(e) {}
+            }
+        });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    </script>
+    <style>
+    .mermaid { text-align: center; margin: 12px 0; }
+    .mermaid svg { max-width: 100%; height: auto; }
+    .mermaid-rendered { display: none; }
+    .katex-display { overflow-x: auto; }
+    .katex { font-size: 1.1em; }
+    </style>
+    """
+
     with gr.Blocks(theme=theme, title="A-Level Tutor", css="""
         .cost-panel { font-size: 12px; }
         footer { display: none !important; }
         .mermaid { max-width: 100%; overflow-x: auto; }
         .mermaid svg { max-width: 100%; height: auto; }
-    """) as demo:
+    """, head=mermaid_init) as demo:
         session_id = gr.State(value=lambda: os.urandom(8).hex())
 
         # ── Header ──
@@ -350,6 +380,10 @@ def build_ui():
                     type="messages",
                     height=500,
                     show_copy_button=True,
+                    latex_delimiters=[
+                        {"left": "$$", "right": "$$", "display": True},
+                        {"left": "$", "right": "$", "display": False},
+                    ],
                 )
 
                 with gr.Row():

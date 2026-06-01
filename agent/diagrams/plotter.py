@@ -52,8 +52,6 @@ COLORS = {
     "eq": "#1a1a1a", "grid": "#e0e0e0",
 }
 
-# Staggered x positions — each curve label at a different spot
-LABEL_X_POSITIONS = [0.82, 0.25, 0.55, 0.45, 0.68, 0.88, 0.18, 0.72]
 
 
 def _hash_spec(spec: dict) -> str:
@@ -83,30 +81,45 @@ def render_economics(spec: dict) -> Optional[str]:
         return None
 
 
-def _label_offset_above_below(slope: float, x0: float, y0: float, x_max: float, y_max: float):
-    """
-    Place label perpendicular to curve at clear distance.
-    Demand (negative slope): label above the curve
-    Supply (positive slope): label below the curve
-    """
-    # Perpendicular normal: (-slope, 1) normalized
-    mag = np.sqrt(slope**2 + 1)
-    nx, ny = -slope / mag, 1 / mag
-    # Clear offset: ~10% of plot size away from the line
-    dist = 0.8 * min(x_max, y_max) / 10
+def _curves_endpoints(curves, drawn, x_max, y_max):
+    """Collect the rightmost visible point of each labeled curve for top-right label placement."""
+    endpoints = []
+    for c in curves:
+        name = c.get("id", "")
+        label = c.get("label", "")
+        if not label or name not in drawn:
+            continue
+        d = drawn[name]
+        if d["type"] == "line":
+            # y at right edge of visible range
+            y_at_right = d["i"] + d["s"] * x_max
+            if 0 <= y_at_right <= y_max:
+                endpoints.append((label, y_at_right, COLORS.get(c.get("color", "demand"), "#333")))
+        elif d["type"] == "vertical":
+            endpoints.append((label, y_max * 0.82, COLORS.get(c.get("color", "lras"), "#333")))
+        elif d["type"] == "horizontal":
+            endpoints.append((label, d["y"], COLORS.get(c.get("color", "price_ctrl"), "#333")))
+    # Sort by y: highest curve first (top), lowest last (bottom)
+    endpoints.sort(key=lambda e: -e[1])
+    return endpoints
 
-    if slope < 0:
-        # Demand: label above-left
-        ox = x0 + nx * dist * 1.5
-        oy = y0 + ny * dist * 1.5
-    else:
-        # Supply: label below-right
-        ox = x0 + nx * dist * 1.5
-        oy = y0 + ny * dist * 1.5
 
-    ox = max(0.2, min(x_max - 0.2, ox))
-    oy = max(0.2, min(y_max - 0.2, oy))
-    return ox, oy
+def _place_labels_top_right(ax, endpoints, x_max, y_max):
+    """Stack labels vertically in top-right corner, avoiding all elements."""
+    n = len(endpoints)
+    if n == 0:
+        return
+    start_y = y_max - 0.5
+    gap = min(0.9, (y_max - 1.5) / max(n, 1))
+    for i, (text, _, color) in enumerate(endpoints):
+        lx = x_max - 0.3
+        ly = start_y - i * gap
+        ly = max(0.5, min(y_max - 0.3, ly))
+        ax.annotate(text, xy=(lx, ly), fontsize=14, fontweight='bold',
+                    color=color, ha='right', va='center',
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
+                             edgecolor=color, linewidth=1.5, alpha=1.0),
+                    zorder=10)
 
 
 def _plot(spec: dict):
@@ -127,15 +140,13 @@ def _plot(spec: dict):
     ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
 
     drawn = {}
-    label_idx = 0
 
-    for i, c in enumerate(curves):
+    for c in curves:
         ctype = c.get("type", "line")
         name = c.get("id", "")
         color = COLORS.get(c.get("color", "demand"), "#333")
         style = c.get("style", "-")
         width = c.get("width", 2)
-        label = c.get("label", "")
 
         if ctype == "line":
             i_val = c.get("intercept", 5)
@@ -144,46 +155,23 @@ def _plot(spec: dict):
             y_vals = i_val + s_val * x_vals
             mask = (y_vals >= 0) & (y_vals <= y_max)
             x_vis, y_vis = x_vals[mask], y_vals[mask]
-
             if len(x_vis) > 1:
-                # Draw continuous line — never cut
                 ax.plot(x_vis, y_vis, linestyle=style, color=color, linewidth=width, zorder=2)
-
-                if label:
-                    x_pos = c.get("label_pos", None)
-                    if x_pos is None:
-                        x_pos = LABEL_X_POSITIONS[min(label_idx, len(LABEL_X_POSITIONS) - 1)]
-                        label_idx += 1
-                    center = int(len(x_vis) * x_pos)
-                    center = max(0, min(len(x_vis) - 1, center))
-                    lx, ly = x_vis[center], y_vis[center]
-
-                    # Offset above (demand) or below (supply), perpendicular to line
-                    ox, oy = _label_offset_above_below(s_val, lx, ly, x_max, y_max)
-
-                    ax.annotate(label, xy=(lx, ly), fontsize=14, fontweight='bold',
-                                color=color, xytext=(ox, oy), textcoords='data',
-                                bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
-                                         edgecolor=color, linewidth=1.0, alpha=1.0),
-                                zorder=6)
-
             drawn[name] = {"type": "line", "i": i_val, "s": s_val}
 
         elif ctype == "vertical":
             x = c.get("x", 5)
             ax.axvline(x=x, color=color, linewidth=2, linestyle=style, zorder=2)
-            if label:
-                ax.text(x + 0.3, y_max * 0.82, label, fontsize=14, fontweight='bold',
-                        color=color, zorder=6)
             drawn[name] = {"type": "vertical", "x": x}
 
         elif ctype == "horizontal":
             y = c.get("y", 3)
             ax.axhline(y=y, color=color, linewidth=1.5, linestyle=style, zorder=2)
-            if label:
-                ax.text(x_max * 0.85, y + 0.2, label, fontsize=14, fontweight='bold',
-                        color=color, zorder=6)
             drawn[name] = {"type": "horizontal", "y": y}
+
+    # All curve labels stacked in top-right corner
+    endpoints = _curves_endpoints(curves, drawn, x_max, y_max)
+    _place_labels_top_right(ax, endpoints, x_max, y_max)
 
     # Equilibrium points
     eq_points = {}

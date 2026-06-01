@@ -122,7 +122,8 @@ def _plot(spec: dict):
         elif ctype == "horizontal":
             _draw_hline(ax, c, x_max, drawn)
 
-    # Compute & draw equilibrium points
+    # Compute & draw equilibrium points — SAVE their coordinates
+    eq_points = {}
     for eq in equilibria:
         c1, c2 = eq.get("c1"), eq.get("c2")
         if not (c1 and c2 and c1 in drawn and c2 in drawn):
@@ -131,23 +132,26 @@ def _plot(spec: dict):
         xy = None
         if d1["type"] == "line" and d2["type"] == "line":
             xy = solve_line_intersection(d1["i"], d1["s"], d2["i"], d2["s"])
-        elif d1["type"] == "vertical":
-            xy = (d1["x"], d2["i"] + d2["s"] * d1["x"]) if d2["type"] == "line" else None
-        elif d2["type"] == "vertical":
-            xy = (d2["x"], d1["i"] + d1["s"] * d2["x"]) if d1["type"] == "line" else None
-        elif d1["type"] == "horizontal":
-            xv = x_for_y(d2["i"], d2["s"], d1["y"]) if d2["type"] == "line" else None
+        elif d1["type"] == "vertical" and d2["type"] == "line":
+            xy = (d1["x"], d2["i"] + d2["s"] * d1["x"])
+        elif d1["type"] == "line" and d2["type"] == "vertical":
+            xy = (d2["x"], d1["i"] + d1["s"] * d2["x"])
+        elif d1["type"] == "horizontal" and d2["type"] == "line":
+            xv = x_for_y(d2["i"], d2["s"], d1["y"])
             xy = (xv, d1["y"]) if xv else None
-        elif d2["type"] == "horizontal":
-            xv = x_for_y(d1["i"], d1["s"], d2["y"]) if d1["type"] == "line" else None
+        elif d1["type"] == "line" and d2["type"] == "horizontal":
+            xv = x_for_y(d1["i"], d1["s"], d2["y"])
             xy = (xv, d2["y"]) if xv else None
 
         if xy and 0 <= xy[0] <= x_max and 0 <= xy[1] <= y_max:
             _draw_eq_point(ax, xy, eq)
+            label = eq.get("label", "")
+            if label:
+                eq_points[label] = xy
 
-    # Draw shading
+    # Draw shading — uses equilibrium point references
     for sh in shading:
-        _draw_shading(ax, sh, drawn, x_max)
+        _draw_shading(ax, sh, drawn, eq_points, x_max)
 
     return fig, ax
 
@@ -220,27 +224,34 @@ def _draw_eq_point(ax, xy, eq):
                     bbox=dict(boxstyle='round,pad=0.25', facecolor='white',
                              edgecolor='#999', linewidth=0.5, alpha=0.9))
 
-def _draw_shading(ax, sh, drawn, x_max):
-    stype = sh.get("type", "between")
-    c1_id = sh.get("c1", "")
-    c2_id = sh.get("c2", "")
-    if not (c1_id in drawn and c2_id in drawn):
+def _draw_shading(ax, sh, drawn, eq_points, x_max):
+    """Shade between curves using equilibrium point references for x-bounds."""
+    upper_id = sh.get("upper", "")
+    lower_id = sh.get("lower", "")
+    if not (upper_id in drawn and lower_id in drawn):
         return
-    d1, d2 = drawn[c1_id], drawn[c2_id]
-    if d1["type"] != "line" or d2["type"] != "line":
+    du, dl = drawn[upper_id], drawn[lower_id]
+    if du["type"] != "line" or dl["type"] != "line":
         return
 
-    x1 = sh.get("x1", 0)
-    x2 = sh.get("x2", x_max)
+    # Get x-bounds from equilibrium point labels
+    left_label = sh.get("left_eq", "")
+    right_label = sh.get("right_eq", "")
+    x1 = eq_points.get(left_label, (0, 0))[0] if left_label else 0
+    x2 = eq_points.get(right_label, (x_max, 0))[0] if right_label else x_max
+
+    if x1 >= x2:
+        return
+
     xs = np.linspace(x1, x2, 100)
-    y1 = d1["i"] + d1["s"] * xs
-    y2 = d2["i"] + d2["s"] * xs
+    y_upper = du["i"] + du["s"] * xs
+    y_lower = dl["i"] + dl["s"] * xs
     color = COLORS.get(sh.get("color", "dwl"), "#F1948A")
     alpha = sh.get("alpha", 0.25)
-    ax.fill_between(xs, y1, y2, color=color, alpha=alpha, zorder=1)
+    ax.fill_between(xs, y_upper, y_lower, color=color, alpha=alpha, zorder=1)
 
     label = sh.get("label", "")
     lx, ly = sh.get("label_pos", (0, 0))
     if label and lx and ly:
-        ax.annotate(label, xy=(lx, ly), fontsize=9, color=color, alpha=0.8,
-                    ha='center', va='center')
+        ax.annotate(label, xy=(lx, ly), fontsize=10, color=color, alpha=0.8,
+                    ha='center', va='center', fontweight='bold')

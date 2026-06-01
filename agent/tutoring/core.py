@@ -415,6 +415,9 @@ class Agent:
 
         msg = response["choices"][0]["message"]
 
+        # Preserve reasoning_content for API continuity
+        reasoning_content = msg.get("reasoning_content", "")
+
         max_tool_rounds = 3
         for _ in range(max_tool_rounds):
             if msg.get("tool_calls"):
@@ -458,9 +461,14 @@ class Agent:
                 break
 
         final_content = msg.get("content", "")
+        # W5: Save reasoning_content for API continuity (DeepSeek requires it)
+        reasoning = msg.get("reasoning_content", "")
         # W5: Sanitize output — remove self-correction artifacts
         final_content = _sanitize_output(final_content)
-        self.conversation.append({"role": "assistant", "content": final_content})
+        assistant_msg = {"role": "assistant", "content": final_content}
+        if reasoning:
+            assistant_msg["reasoning_content"] = reasoning
+        self.conversation.append(assistant_msg)
         if self.conv_id:
             save_message(self.conv_id, "assistant", final_content)
 

@@ -144,6 +144,11 @@ STATUS_TEMPLATES = {
         '📸 AI 批改作业中<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
         '</div>'
     ),
+    "drawing": (
+        '<div class="agent-status" style="background:linear-gradient(135deg,#ffecd2,#fcb69f);color:#1a1a2e">'
+        '📐 正在绘制图表<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>'
+        '</div>'
+    ),
     "done": (
         '<div class="agent-status done">'
         '✅ 回答完成'
@@ -307,6 +312,8 @@ def build_ui():
     with gr.Blocks(theme=theme, title="A-Level Tutor", css="""
         .cost-panel { font-size: 12px; }
         footer { display: none !important; }
+        .mermaid { max-width: 100%; overflow-x: auto; }
+        .mermaid svg { max-width: 100%; height: auto; }
     """) as demo:
         session_id = gr.State(value=lambda: os.urandom(8).hex())
 

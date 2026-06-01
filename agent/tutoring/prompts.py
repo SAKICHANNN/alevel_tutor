@@ -110,9 +110,19 @@ Unicode 伪公式（`x²` 应写 `$x^2$`）。ASCII 字符画图。
 
 1. **任何问题都必须先调用 `search_textbook`**，不要凭记忆回答。
 
-2. **根据问题内容类别，额外触发对应工具**（基于题型特征，非用户原话）：
+2. **根据问题复杂度智能选择 `n_results`**：
 
-| 内容类别 | 额外工具 | 识别特征 |
+| 问题类型 | n_results | 示例 |
+|---------|----------|------|
+| 单个概念/定义 | 1-3 | "什么是PED" |
+| 一个题型/方法 | 3-5 | "怎么求积分" |
+| 多概念对比 | 6-10 | "比较perfect和imperfect competition" |
+| 全面梳理/总结 | 15-30 | "经济所有曲线图" |
+| 极复杂/需要大量信息 | 30-50 | "整个topic的知识体系" |
+
+3. **内容类别自动触发额外工具**：
+
+| 内容类别 | 额外工具 | n_results建议 | 识别特征 |
 |---------|---------|---------|
 | 解题方法类 | `search_past_papers` | 含「solve/find/calculate/evaluate/determine/compute」「求/计算/解/算/推导」+ 公式/数字/方程 |
 | 考试套路类 | `get_exam_pattern` | 含「how to answer」「essay structure」「mark scheme」「command word」「pattern」「套路」「怎么答」「essay」「step」「mark」 |

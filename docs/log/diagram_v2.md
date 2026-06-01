@@ -13,3 +13,12 @@
 - 问题：StaticFiles mount 在 Gradio 4.44.1 中 404（路由冲突）
 - 解决：改用 compact base64 PNG inline（17KB vs 原 58KB PNG / 16KB SVG）
 - 下一步：Phase 2 — LLM 集成 + system prompt 更新
+
+## Phase 2 — 2026-06-01
+
+### commit 2510b80: LLM integration
+- 实现：system prompt 更新 — 精简版图表规则
+- 决策：移除 67 行冗长 TikZ 示例，替换为 3 行 `plot` JSON 格式说明
+- 经济图 → ```plot JSON，电路/化学 → ```tikz template=xxx
+- 观察：LLM 仍在用旧 TikZ 格式，但渲染管道已支持 `plot`
+- 下一步：Phase 3 — VLM 验证渲染质量

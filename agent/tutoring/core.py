@@ -35,6 +35,8 @@ console = Console()
 _SELF_CORRECTION_PATTERNS = [
     r'(?:❌|不对，|等等，重新|重新算一下|查到了，).*?(?:不对|重新|纠正)',
     r'等等.*?重新.*?算',
+    r'等一下，.*?(?:不对|画法不对|不.?行)',
+    r'(?:嗯|算了|想了.*?).*(?:让我重新|换一种|换.?方式)',
 ]
 # Exclude code blocks from detection
 _CODE_BLOCK_RE = re.compile(r'```[^`]*```', re.DOTALL)
@@ -69,6 +71,14 @@ def _fix_katex_with_report(content: str) -> tuple:
     """Fix KaTeX patterns and return (fixed_content, fix_report dict)."""
     fixes = {"currency": 0, "stray_dollar": 0, "ampersand": 0, "ce_command": 0}
 
+    # Pre-step: protect code blocks (```...```) from all fixer operations.
+    # $ inside code blocks is part of code, not currency or LaTeX delimiters.
+    code_blocks = []
+    def _save_cb(m):
+        code_blocks.append(m.group(0))
+        return f"\x00CB{len(code_blocks)-1}\x00"
+    content = re.sub(r'```[^`]*```', _save_cb, content, flags=re.DOTALL)
+
     # Pre-pass: fix currency $ before scanning LaTeX blocks
     currency_matches = _CURRENCY_DOLLAR_RE.findall(content)
     fixes["currency"] = len(currency_matches)
@@ -99,6 +109,9 @@ def _fix_katex_with_report(content: str) -> tuple:
         before = content
         content = content.replace('$', '＄')
         fixes["stray_dollar"] = before.count('$')
+        # Restore code blocks
+        for k, cb in enumerate(code_blocks):
+            content = content.replace(f"\x00CB{k}\x00", cb)
         return content, fixes
 
     # Build result piece by piece, protecting LaTeX blocks
@@ -129,7 +142,12 @@ def _fix_katex_with_report(content: str) -> tuple:
     non_latex = non_latex.replace('$', '＄')
     result.append(non_latex)
 
-    return ''.join(result), fixes
+    content = ''.join(result)
+    # Restore code blocks
+    for k, cb in enumerate(code_blocks):
+        content = content.replace(f"\x00CB{k}\x00", cb)
+
+    return content, fixes
 
 
 def _sanitize_output(content: str) -> str:

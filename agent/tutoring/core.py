@@ -173,7 +173,9 @@ def _sanitize_output(content: str) -> str:
 
     # Detect ASCII art diagrams (only if no rendered diagrams present)
     if "data:image/" not in content:
-        ascii_matches = _ASCII_ART_PATTERN.findall(content)
+        # Exclude code blocks from ASCII detection
+        check_ascii = _CODE_BLOCK_RE.sub('', content)
+        ascii_matches = _ASCII_ART_PATTERN.findall(check_ascii)
         if len(ascii_matches) >= 3:
             content += (
                 "\n\n---\n"
